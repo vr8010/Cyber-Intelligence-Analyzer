@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Results - {{ domain }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Scan Results: {{ domain }}</h1>
+            <a href="/" class="back-link">← Back to Home</a>
+            <div class="export-buttons">
+                <a href="/export/json/{{ domain }}" class="btn-export">📄 Export JSON</a>
+                <a href="/export/xml/{{ domain }}" class="btn-export">📋 Export XML</a>
+                <a href="/export/pdf/{{ domain }}" class="btn-export">📕 Export PDF</a>
+            </div>
+        </header>
+        
+        <main>
+            <!-- CVSS Risk Score Section -->
+            <section class="result-section cvss-section">
+                <h2>⚠️ CVSS Risk Score</h2>
+                <div class="cvss-score {{ cvss.color }}">
+                    <div class="score-value">{{ cvss.score }}</div>
+                    <div class="score-severity">{{ cvss.severity }}</div>
+                </div>
+                {% if cvss.findings %}
+                <div class="findings">
+                    <h3>Security Findings ({{ cvss.total_findings }})</h3>
+                    <ul>
+                        {% for finding in cvss.findings %}
+                        <li>{{ finding }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% else %}
+                <p class="no-findings">✅ No major security issues detected</p>
+                {% endif %}
+            </section>
+            <section class="result-section">
+                <h2>🔐 SSL Certificate</h2>
+                {% if ssl.valid %}
+                <p><strong>Status:</strong> ✅ Valid</p>
+                <p><strong>Issuer:</strong> {{ ssl.issuer }}</p>
+                <p><strong>Expiry:</strong> {{ ssl.expiry }}</p>
+                <p><strong>Subject:</strong> {{ ssl.subject }}</p>
+                {% else %}
+                <p><strong>Status:</strong> ❌ Invalid</p>
+                <p><strong>Error:</strong> {{ ssl.error }}</p>
+                {% endif %}
+            </section>
+            
+            <section class="result-section">
+                <h2>🛡 Security Headers</h2>
+                {% if headers.error %}
+                <p>Error: {{ headers.error }}</p>
+                {% else %}
+                <ul>
+                    {% for key, value in headers.items() %}
+                    <li><strong>{{ key }}:</strong> {{ value }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </section>
+            
+            <section class="result-section">
+                <h2>🎣 Phishing Detection</h2>
+                <p><strong>Risk Score:</strong> {{ phishing.score }}/100</p>
+                <p><strong>Risk Level:</strong> {{ phishing.risk_level }}</p>
+                <p><strong>Indicators:</strong></p>
+                <ul>
+                    {% for indicator in phishing.indicators %}
+                    <li>{{ indicator }}</li>
+                    {% else %}
+                    <li>No suspicious indicators found</li>
+                    {% endfor %}
+                </ul>
+            </section>
+            
+            <section class="result-section">
+                <h2>📡 DNS Information</h2>
+                {% if dns.error %}
+                <p>Error: {{ dns.error }}</p>
+                {% else %}
+                <p><strong>IP Address:</strong> {{ dns.ip }}</p>
+                {% for record_type in ['A', 'MX', 'TXT', 'NS'] %}
+                {% if dns[record_type] %}
+                <p><strong>{{ record_type }} Records:</strong></p>
+                <ul>
+                    {% for record in dns[record_type] %}
+                    <li>{{ record }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                {% endfor %}
+                {% endif %}
+            </section>
+            
+            <section class="result-section">
+                <h2>📜 WHOIS Information</h2>
+                {% if whois.error %}
+                <p>Error: {{ whois.error }}</p>
+                {% else %}
+                <p><strong>Domain Name:</strong> {{ whois.domain_name }}</p>
+                <p><strong>Registrar:</strong> {{ whois.registrar }}</p>
+                <p><strong>Creation Date:</strong> {{ whois.creation_date }}</p>
+                <p><strong>Expiration Date:</strong> {{ whois.expiration_date }}</p>
+                <p><strong>Domain Age:</strong> {{ whois.age_days }} days</p>
+                {% if whois.name_servers %}
+                <p><strong>Name Servers:</strong></p>
+                <ul>
+                    {% for ns in whois.name_servers %}
+                    <li>{{ ns }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                {% if whois.emails %}
+                <p><strong>Registrant Email:</strong></p>
+                <ul>
+                    {% for email in whois.emails %}
+                    <li>{{ email }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                {% endif %}
+            </section>
+            
+            <section class="result-section">
+                <h2>🌐 Subdomains Found</h2>
+                {% if subdomains %}
+                <ul>
+                    {% for subdomain in subdomains %}
+                    <li>{{ subdomain }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p>No common subdomains found</p>
+                {% endif %}
+            </section>
+            
+            <!-- Open Ports Section -->
+            <section class="result-section">
+                <h2>🔌 Open Ports</h2>
+                {% if ports.error %}
+                <p>Error: {{ ports.error }}</p>
+                {% elif ports.open_ports %}
+                <p><strong>Total Open Ports:</strong> {{ ports.total_open }}</p>
+                <table class="ports-table">
+                    <thead>
+                        <tr>
+                            <th>Port</th>
+                            <th>Service</th>
+                            <th>State</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for port in ports.open_ports %}
+                        <tr>
+                            <td>{{ port.port }}</td>
+                            <td>{{ port.service }}</td>
+                            <td><span class="badge-open">{{ port.state }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p>No common ports are open</p>
+                {% endif %}
+            </section>
+            
+            <!-- IP Geolocation Section -->
+            <section class="result-section">
+                <h2>🌍 IP Geolocation</h2>
+                {% if ip_info.error %}
+                <p>Error: {{ ip_info.error }}</p>
+                {% else %}
+                <p><strong>IP Address:</strong> {{ ip_info.ip }}</p>
+                <p><strong>Location:</strong> {{ ip_info.city }}, {{ ip_info.region }}, {{ ip_info.country }} ({{ ip_info.country_code }})</p>
+                <p><strong>Coordinates:</strong> {{ ip_info.lat }}, {{ ip_info.lon }}</p>
+                <p><strong>Timezone:</strong> {{ ip_info.timezone }}</p>
+                <p><strong>ISP:</strong> {{ ip_info.isp }}</p>
+                <p><strong>Organization:</strong> {{ ip_info.org }}</p>
+                <p><strong>ASN:</strong> {{ ip_info.asn }}</p>
+                {% endif %}
+            </section>
+            
+            <!-- CDN Detection Section -->
+            <section class="result-section">
+                <h2>☁️ CDN Detection</h2>
+                {% if cdn_info.cdn_detected %}
+                <p><strong>CDN Detected:</strong> ✅ Yes</p>
+                <p><strong>Provider:</strong> {{ cdn_info.provider|upper }}</p>
+                {% if cdn_info.cname %}
+                <p><strong>CNAME:</strong> {{ cdn_info.cname }}</p>
+                {% endif %}
+                {% if cdn_info.headers %}
+                <p><strong>CDN Headers:</strong></p>
+                <ul>
+                    {% for key, value in cdn_info.headers.items() %}
+                    <li><strong>{{ key }}:</strong> {{ value }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                {% else %}
+                <p><strong>CDN Detected:</strong> ❌ No</p>
+                {% endif %}
+            </section>
+            
+            <!-- Traceroute Section -->
+            <section class="result-section">
+                <h2>🛤️ Network Traceroute</h2>
+                {% if traceroute.error %}
+                <div class="info-box">
+                    <p>⚠️ {{ traceroute.error }}</p>
+                    <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                        Note: Traceroute may be blocked by firewalls or network policies. This is normal and doesn't affect other scan results.
+                    </p>
+                </div>
+                {% elif traceroute.hops %}
+                <p><strong>Total Hops:</strong> {{ traceroute.total_hops }}</p>
+                <p><strong>Target IP:</strong> {{ traceroute.ip }}</p>
+                <table class="traceroute-table">
+                    <thead>
+                        <tr>
+                            <th>Hop</th>
+                            <th>IP Address</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for hop in traceroute.hops %}
+                        <tr>
+                            <td>{{ hop.hop }}</td>
+                            <td>{{ hop.ip }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="info-box">
+                    <p>ℹ️ No traceroute data available</p>
+                    <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                        Traceroute may be blocked by network policies or firewalls.
+                    </p>
+                </div>
+                {% endif %}
+            </section>
+            
+            <!-- HTTP Header Analysis Section -->
+            <section class="result-section">
+                <h2>📊 HTTP Header Analysis</h2>
+                {% if http_analysis.error %}
+                <p>Error: {{ http_analysis.error }}</p>
+                {% else %}
+                <div class="security-score-box">
+                    <h3>Security Score: {{ http_analysis.security_percentage }}%</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ http_analysis.security_percentage }}%"></div>
+                    </div>
+                    <p><strong>Rating:</strong> {{ http_analysis.security_rating }}</p>
+                    <p><strong>Score:</strong> {{ http_analysis.security_score }}/{{ http_analysis.max_score }}</p>
+                </div>
+                
+                {% if http_analysis.response_time_ms %}
+                <p><strong>Response Time:</strong> {{ http_analysis.response_time_ms }}ms</p>
+                {% endif %}
+                
+                {% if http_analysis.vulnerabilities %}
+                <div class="vulnerabilities-box">
+                    <h4>⚠️ Vulnerabilities Found ({{ http_analysis.vulnerabilities|length }})</h4>
+                    <ul>
+                        {% for vuln in http_analysis.vulnerabilities %}
+                        <li>{{ vuln }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                {% if http_analysis.recommendations %}
+                <div class="recommendations-box">
+                    <h4>💡 Recommendations ({{ http_analysis.recommendations|length }})</h4>
+                    <ul>
+                        {% for rec in http_analysis.recommendations %}
+                        <li>{{ rec }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% endif %}
+            </section>
+            
+            <!-- Technology Stack Section -->
+            <section class="result-section">
+                <h2>🔧 Technology Stack</h2>
+                {% if tech_stack.error %}
+                <p>Error: {{ tech_stack.error }}</p>
+                {% else %}
+                <p><strong>Total Technologies Detected:</strong> {{ tech_stack.total_detected }}</p>
+                
+                {% if tech_stack.responsive is defined %}
+                <p><strong>Responsive Design:</strong> {{ 'Yes ✅' if tech_stack.responsive else 'No ❌' }}</p>
+                {% endif %}
+                
+                {% for category, technologies in tech_stack.technologies.items() %}
+                <div class="tech-category">
+                    <h4>{{ category|title }}</h4>
+                    <div class="tech-badges">
+                        {% for tech in technologies %}
+                        <span class="tech-badge">{{ tech }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </section>
+            
+            <!-- Directory Enumeration Section -->
+            <section class="result-section">
+                <h2>📁 Directory Enumeration</h2>
+                {% if directories.error %}
+                <p>Error: {{ directories.error }}</p>
+                {% else %}
+                <p><strong>Paths Checked:</strong> {{ directories.total_checked }}</p>
+                <p><strong>Paths Found:</strong> {{ directories.total_found }}</p>
+                
+                {% if directories.categories %}
+                    {% if directories.categories.accessible %}
+                    <div class="dir-category">
+                        <h4>✅ Accessible ({{ directories.categories.accessible|length }})</h4>
+                        <ul>
+                            {% set ns = namespace(count=0) %}
+                            {% for path in directories.categories.accessible %}
+                            {% if ns.count < 10 %}
+                            <li><code>{{ path.path }}</code> - Status: {{ path.status }}</li>
+                            {% set ns.count = ns.count + 1 %}
+                            {% endif %}
+                            {% endfor %}
+                            {% if directories.categories.accessible|length > 10 %}
+                            <li><em>... and {{ directories.categories.accessible|length - 10 }} more</em></li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    
+                    {% if directories.categories.forbidden %}
+                    <div class="dir-category">
+                        <h4>🔒 Forbidden ({{ directories.categories.forbidden|length }})</h4>
+                        <ul>
+                            {% set ns = namespace(count=0) %}
+                            {% for path in directories.categories.forbidden %}
+                            {% if ns.count < 5 %}
+                            <li><code>{{ path.path }}</code> - Status: {{ path.status }}</li>
+                            {% set ns.count = ns.count + 1 %}
+                            {% endif %}
+                            {% endfor %}
+                            {% if directories.categories.forbidden|length > 5 %}
+                            <li><em>... and {{ directories.categories.forbidden|length - 5 }} more</em></li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    
+                    {% if directories.categories.redirects %}
+                    <div class="dir-category">
+                        <h4>↪️ Redirects ({{ directories.categories.redirects|length }})</h4>
+                        <ul>
+                            {% set ns = namespace(count=0) %}
+                            {% for path in directories.categories.redirects %}
+                            {% if ns.count < 5 %}
+                            <li><code>{{ path.path }}</code> - Status: {{ path.status }}</li>
+                            {% set ns.count = ns.count + 1 %}
+                            {% endif %}
+                            {% endfor %}
+                            {% if directories.categories.redirects|length > 5 %}
+                            <li><em>... and {{ directories.categories.redirects|length - 5 }} more</em></li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                {% else %}
+                <p>No common directories or files found</p>
+                {% endif %}
+                {% endif %}
+            </section>
+            
+            <!-- Email Harvesting Section -->
+            <section class="result-section">
+                <h2>📧 Email Harvesting</h2>
+                {% if emails.error %}
+                <p>Error: {{ emails.error }}</p>
+                {% else %}
+                <p><strong>Total Emails Found:</strong> {{ emails.total_found }}</p>
+                {% if emails.emails %}
+                <ul>
+                    {% for email in emails.emails %}
+                    <li>
+                        <code>{{ email }}</code>
+                        {% if emails.sources[email] %}
+                        <span class="email-source">({{ emails.sources[email] }})</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p>No email addresses found</p>
+                {% endif %}
+                {% endif %}
+            </section>
+            
+            <!-- WAF Detection Section -->
+            <section class="result-section">
+                <h2>🛡️ WAF Detection</h2>
+                {% if waf_info.error %}
+                <p>Error: {{ waf_info.error }}</p>
+                {% else %}
+                {% if waf_info.waf_detected %}
+                <div class="waf-detected">
+                    <p><strong>WAF Detected:</strong> ✅ Yes</p>
+                    <p><strong>WAF Name:</strong> {{ waf_info.waf_name }}</p>
+                    <p><strong>Confidence:</strong> <span class="confidence-{{ waf_info.confidence|lower }}">{{ waf_info.confidence }}</span></p>
+                    
+                    {% if waf_info.indicators %}
+                    <h4>Indicators:</h4>
+                    <ul>
+                        {% for indicator in waf_info.indicators %}
+                        <li>{{ indicator }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    
+                    {% if waf_info.possible_wafs and waf_info.possible_wafs|length > 1 %}
+                    <h4>Other Possible WAFs:</h4>
+                    <ul>
+                        {% set ns = namespace(count=0) %}
+                        {% for waf in waf_info.possible_wafs %}
+                        {% if ns.count > 0 and ns.count < 5 %}
+                        <li>{{ waf.name }} (Score: {{ waf.score }})</li>
+                        {% endif %}
+                        {% set ns.count = ns.count + 1 %}
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+                {% else %}
+                <p><strong>WAF Detected:</strong> ❌ No</p>
+                <p>No Web Application Firewall detected</p>
+                {% endif %}
+                {% endif %}
+            </section>
+            
+            <!-- Website Fingerprinting Section -->
+            <section class="result-section">
+                <h2>🔍 Website Fingerprinting</h2>
+                {% if fingerprint.error %}
+                <p>Error: {{ fingerprint.error }}</p>
+                {% else %}
+                
+                {% if fingerprint.fingerprints %}
+                <div class="fingerprint-box">
+                    <h4>Digital Fingerprints:</h4>
+                    {% for key, value in fingerprint.fingerprints.items() %}
+                    <p><strong>{{ key|replace('_', ' ')|title }}:</strong> <code>{{ value if value is string else value|tojson }}</code></p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                {% if fingerprint.signatures %}
+                <div class="signatures-box">
+                    <h4>Identified Signatures:</h4>
+                    <ul>
+                        {% for sig in fingerprint.signatures %}
+                        <li>{{ sig }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                {% if fingerprint.characteristics %}
+                <div class="characteristics-box">
+                    <h4>Website Characteristics:</h4>
+                    {% for key, value in fingerprint.characteristics.items() %}
+                    {% if value is string or value is number %}
+                    <p><strong>{{ key|replace('_', ' ')|title }}:</strong> {{ value }}</p>
+                    {% elif value is iterable and value is not string %}
+                    <p><strong>{{ key|replace('_', ' ')|title }}:</strong></p>
+                    <ul>
+                        {% set ns = namespace(count=0) %}
+                        {% for item in value %}
+                        {% if ns.count < 10 %}
+                        <li>{{ item if item is string else item|tojson }}</li>
+                        {% set ns.count = ns.count + 1 %}
+                        {% endif %}
+                        {% endfor %}
+                        {% if value|length > 10 %}
+                        <li><em>... and {{ value|length - 10 }} more</em></li>
+                        {% endif %}
+                    </ul>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% endif %}
+            </section>
+            
+            <!-- Server Banners Section -->
+            <section class="result-section">
+                <h2>🏷️ Server Banners</h2>
+                {% if banners.error %}
+                <p>Error: {{ banners.error }}</p>
+                {% else %}
+                {% if banners.ip %}
+                <p><strong>IP Address:</strong> {{ banners.ip }}</p>
+                {% endif %}
+                
+                {% if banners.http_banner %}
+                <div class="banner-box">
+                    <h4>HTTP Headers:</h4>
+                    {% for header, value in banners.http_banner.items() %}
+                    <p><strong>{{ header }}:</strong> <code>{{ value }}</code></p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                {% if banners.server_info %}
+                <div class="banner-box">
+                    <h4>Server Information:</h4>
+                    {% for key, value in banners.server_info.items() %}
+                    <p><strong>{{ key|title }}:</strong> {{ value }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                {% if banners.service_banners %}
+                <div class="banner-box">
+                    <h4>Service Banners:</h4>
+                    {% for service, banner in banners.service_banners.items() %}
+                    <p><strong>{{ service }}:</strong></p>
+                    <pre>{{ banner }}</pre>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                {% if not banners.http_banner and not banners.service_banners %}
+                <p>No banners retrieved</p>
+                {% endif %}
+                {% endif %}
+            </section>
+            
+            <!-- Reverse IP Lookup Section -->
+            <section class="result-section">
+                <h2>🔄 Reverse IP Lookup</h2>
+                {% if reverse_ip.error %}
+                <p>Error: {{ reverse_ip.error }}</p>
+                {% else %}
+                <p><strong>IP Address:</strong> {{ reverse_ip.ip }}</p>
+                <p><strong>Domains on Same IP:</strong> {{ reverse_ip.total_domains }}</p>
+                
+                {% if reverse_ip.domains_on_ip %}
+                <ul>
+                    {% set ns = namespace(count=0) %}
+                    {% for domain in reverse_ip.domains_on_ip %}
+                    {% if ns.count < 20 %}
+                    <li><code>{{ domain }}</code></li>
+                    {% set ns.count = ns.count + 1 %}
+                    {% endif %}
+                    {% endfor %}
+                    {% if reverse_ip.domains_on_ip|length > 20 %}
+                    <li><em>... and {{ reverse_ip.domains_on_ip|length - 20 }} more</em></li>
+                    {% endif %}
+                </ul>
+                {% else %}
+                <p>{{ reverse_ip.note if reverse_ip.note else 'No other domains found' }}</p>
+                {% endif %}
+                {% endif %}
+            </section>
+        </main>
+    </div>
+</body>
+</html>

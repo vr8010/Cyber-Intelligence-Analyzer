@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Intelligence & Security Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔐 CYBER INTELLIGENCE ANALYZER</h1>
+            <p>[ COMPREHENSIVE SECURITY ANALYSIS SYSTEM v1.0 ]</p>
+            <p style="font-size: 0.9em; color: #00ff41; margin-top: 10px;">
+                >> 20 MODULES ACTIVE | THREAT DETECTION ENABLED | READY TO SCAN
+            </p>
+        </header>
+        
+        <main>
+            <form action="/scan" method="POST" class="scan-form">
+                <input type="text" name="domain" placeholder=">> ENTER TARGET DOMAIN (e.g., example.com)" required>
+                <button type="submit">[ INITIATE SCAN ]</button>
+            </form>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h3>🔒 Security Analysis</h3>
+                    <p>SSL/TLS, Headers, Phishing Detection</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🌐 Network Recon</h3>
+                    <p>Port Scan, Traceroute, CDN Detection</p>
+                </div>
+                <div class="feature-card">
+                    <h3>⚠️ CVSS Scoring</h3>
+                    <p>Automated Risk Assessment (0-10)</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📊 Report Export</h3>
+                    <p>JSON, XML, PDF Formats</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔧 Tech Detection</h3>
+                    <p>CMS, Frameworks, Libraries</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📁 Directory Enum</h3>
+                    <p>Find Hidden Paths & Files</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📡 HTTP Analysis</h3>
+                    <p>Deep Header Inspection</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🌍 IP Geolocation</h3>
+                    <p>Location, ISP, ASN Info</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📧 Email Harvesting</h3>
+                    <p>Extract Contact Emails</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🛡️ WAF Detection</h3>
+                    <p>Identify Firewall Protection</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔍 Fingerprinting</h3>
+                    <p>Website Identification</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🏷️ Banner Grabbing</h3>
+                    <p>Server Version Detection</p>
+                </div>
+            </div>
+            
+            <div class="links">
+                <a href="/dashboard">[ ACCESS DASHBOARD ]</a>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
