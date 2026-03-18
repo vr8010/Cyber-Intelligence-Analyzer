@@ -1,2 +1,2 @@
 // Placeholder for future JavaScript functionality
-console.log('Cyber Intelligence & Security Analyzer loaded');
+console.log('CYBERSCAN.AI loaded');

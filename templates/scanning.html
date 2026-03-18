@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanning {{ domain }}...</title>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #020b1a;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            color: #00e5ff;
+        }
+
+        /* ── Deep navy animated background ── */
+        .bg {
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 60% at 50% 50%, rgba(0,60,120,.35) 0%, transparent 70%),
+                linear-gradient(180deg, #020b1a 0%, #030d22 100%);
+            z-index: 0;
+        }
+
+        /* Circuit grid */
+        .bg::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0,229,255,.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,229,255,.04) 1px, transparent 1px);
+            background-size: 44px 44px;
+        }
+
+        /* Floating circuit dots */
+        .bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                radial-gradient(circle, rgba(0,229,255,.18) 1px, transparent 1px);
+            background-size: 44px 44px;
+            background-position: 22px 22px;
+        }
+
+        /* ── Layout ── */
+        .page {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            gap: 60px;
+            padding: 40px;
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        /* ── Radar / HUD ring ── */
+        .radar-wrap {
+            flex-shrink: 0;
+            position: relative;
+            width: 280px;
+            height: 280px;
+        }
+
+        .radar-svg {
+            width: 100%;
+            height: 100%;
+            animation: radarRotate 6s linear infinite;
+            filter: drop-shadow(0 0 12px rgba(0,229,255,.6));
+        }
+
+        @keyframes radarRotate {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+
+        /* Pulse rings */
+        .pulse-ring {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 1.5px solid rgba(0,229,255,.25);
+            animation: pulseRing 2.4s ease-out infinite;
+        }
+        .pulse-ring:nth-child(2) { animation-delay: .8s; }
+        .pulse-ring:nth-child(3) { animation-delay: 1.6s; }
+
+        @keyframes pulseRing {
+            0%   { transform: scale(.55); opacity: .7; }
+            100% { transform: scale(1.25); opacity: 0; }
+        }
+
+        /* Center gear icon */
+        .radar-center {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2em;
+            filter: drop-shadow(0 0 8px #00e5ff);
+            animation: counterRotate 6s linear infinite;
+        }
+
+        @keyframes counterRotate {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(-360deg); }
+        }
+
+        /* ── Right panel ── */
+        .panel {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .panel-tag {
+            font-size: .7em;
+            letter-spacing: 4px;
+            color: rgba(0,229,255,.5);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .panel-title {
+            font-size: 1.6em;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #00e5ff;
+            text-shadow: 0 0 18px rgba(0,229,255,.6);
+            margin-bottom: 4px;
+        }
+
+        .panel-domain {
+            font-size: .85em;
+            color: rgba(255,255,255,.45);
+            margin-bottom: 28px;
+            letter-spacing: 1px;
+        }
+
+        /* Progress bar */
+        .prog-wrap {
+            background: rgba(0,229,255,.07);
+            border: 1px solid rgba(0,229,255,.2);
+            border-radius: 3px;
+            height: 6px;
+            margin-bottom: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .prog-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #0050ff, #00e5ff, #00ffcc);
+            border-radius: 3px;
+            transition: width .45s ease;
+            box-shadow: 0 0 10px rgba(0,229,255,.7);
+        }
+
+        /* Shimmer on fill */
+        .prog-fill::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0;
+            width: 40px; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent);
+            animation: shimmer 1.2s linear infinite;
+        }
+
+        @keyframes shimmer {
+            from { transform: translateX(-40px); }
+            to   { transform: translateX(40px); }
+        }
+
+        .prog-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: .72em;
+            color: rgba(0,229,255,.5);
+            margin-bottom: 22px;
+            letter-spacing: 1px;
+        }
+
+        /* Module log */
+        .mod-log {
+            list-style: none;
+            max-height: 260px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0,229,255,.3) transparent;
+        }
+
+        .mod-log::-webkit-scrollbar { width: 4px; }
+        .mod-log::-webkit-scrollbar-thumb { background: rgba(0,229,255,.3); border-radius: 2px; }
+
+        .mod-log li {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 7px 10px;
+            font-size: .8em;
+            border-bottom: 1px solid rgba(0,229,255,.06);
+            letter-spacing: .5px;
+            transition: all .25s;
+        }
+
+        .mod-log li.active {
+            color: #00e5ff;
+            background: rgba(0,229,255,.05);
+            border-left: 2px solid #00e5ff;
+        }
+
+        .mod-log li.done {
+            color: rgba(0,229,255,.3);
+            border-left: 2px solid rgba(0,229,255,.15);
+        }
+
+        .mod-log li.done .li-icon { color: #00ffcc; }
+
+        .li-icon { width: 14px; text-align: center; flex-shrink: 0; }
+
+        /* Spinner */
+        .spin {
+            display: inline-block;
+            width: 11px; height: 11px;
+            border: 1.5px solid rgba(0,229,255,.2);
+            border-top-color: #00e5ff;
+            border-radius: 50%;
+            animation: spin .65s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Status line */
+        .status-line {
+            margin-top: 18px;
+            font-size: .75em;
+            color: rgba(0,229,255,.55);
+            letter-spacing: 1.5px;
+            min-height: 18px;
+        }
+
+        .status-line span {
+            color: #00e5ff;
+            text-shadow: 0 0 8px rgba(0,229,255,.5);
+        }
+
+        /* Responsive */
+        @media (max-width: 700px) {
+            .page { flex-direction: column; gap: 30px; padding: 24px; }
+            .radar-wrap { width: 180px; height: 180px; }
+            .panel-title { font-size: 1.2em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg"></div>
+
+    <div class="page">
+        <!-- HUD Radar -->
+        <div class="radar-wrap">
+            <div class="pulse-ring"></div>
+            <div class="pulse-ring"></div>
+            <div class="pulse-ring"></div>
+
+            <svg class="radar-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Outer rings -->
+                <circle cx="100" cy="100" r="96" stroke="#00e5ff" stroke-width="1.5" stroke-dasharray="6 4" opacity=".7"/>
+                <circle cx="100" cy="100" r="80" stroke="#00e5ff" stroke-width="1"  stroke-dasharray="3 6" opacity=".4"/>
+                <circle cx="100" cy="100" r="64" stroke="#00e5ff" stroke-width="1.5" opacity=".6"/>
+                <circle cx="100" cy="100" r="48" stroke="#00e5ff" stroke-width="1"  stroke-dasharray="4 4" opacity=".35"/>
+                <circle cx="100" cy="100" r="32" stroke="#00e5ff" stroke-width="1.5" opacity=".5"/>
+                <!-- Cross hairs -->
+                <line x1="100" y1="4"   x2="100" y2="196" stroke="#00e5ff" stroke-width=".6" opacity=".25"/>
+                <line x1="4"   y1="100" x2="196" y2="100" stroke="#00e5ff" stroke-width=".6" opacity=".25"/>
+                <!-- Arc segments -->
+                <path d="M100 4 A96 96 0 0 1 196 100" stroke="#00e5ff" stroke-width="3" stroke-linecap="round" opacity=".9"/>
+                <path d="M100 196 A96 96 0 0 1 4 100"  stroke="#00e5ff" stroke-width="1.5" stroke-linecap="round" opacity=".4"/>
+                <!-- Tick marks -->
+                <line x1="100" y1="4"  x2="100" y2="14" stroke="#00e5ff" stroke-width="2" opacity=".8"/>
+                <line x1="196" y1="100" x2="186" y2="100" stroke="#00e5ff" stroke-width="2" opacity=".8"/>
+                <line x1="100" y1="196" x2="100" y2="186" stroke="#00e5ff" stroke-width="2" opacity=".8"/>
+                <line x1="4"   y1="100" x2="14"  y2="100" stroke="#00e5ff" stroke-width="2" opacity=".8"/>
+                <!-- Sweep gradient -->
+                <path d="M100 100 L196 100 A96 96 0 0 0 100 4 Z" fill="url(#sweep)" opacity=".15"/>
+                <defs>
+                    <linearGradient id="sweep" x1="100" y1="100" x2="196" y2="4" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#00e5ff" stop-opacity="0"/>
+                        <stop offset="100%" stop-color="#00e5ff" stop-opacity="1"/>
+                    </linearGradient>
+                </defs>
+            </svg>
+
+            <div class="radar-center">⚙</div>
+        </div>
+
+        <!-- Panel -->
+        <div class="panel">
+            <p class="panel-tag">// CYBERSCAN.AI — ACTIVE SCAN</p>
+            <h1 class="panel-title">SCANNING TARGET</h1>
+            <p class="panel-domain">{{ domain }}</p>
+
+            <div class="prog-wrap">
+                <div class="prog-fill" id="progFill"></div>
+            </div>
+            <div class="prog-meta">
+                <span id="progLabel">Initializing...</span>
+                <span id="progPct">0%</span>
+            </div>
+
+            <ul class="mod-log" id="modLog"></ul>
+
+            <p class="status-line" id="statusLine">
+                <span>&gt;&gt;</span> Connecting to target...
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const domain  = "{{ domain }}";
+        const log     = document.getElementById('modLog');
+        const fill    = document.getElementById('progFill');
+        const pct     = document.getElementById('progPct');
+        const lbl     = document.getElementById('progLabel');
+        const status  = document.getElementById('statusLine');
+        const items   = {};
+
+        function addItem(step, label) {
+            if (items[step]) return;
+            const li = document.createElement('li');
+            li.id = 'step-' + step;
+            li.className = 'active';
+            li.innerHTML = `<span class="li-icon"><span class="spin"></span></span>${label}`;
+            log.appendChild(li);
+            items[step] = { el: li, label };
+            li.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function markDone(step) {
+            const entry = items[step];
+            if (!entry) return;
+            entry.el.className = 'done';
+            entry.el.innerHTML = `<span class="li-icon">✓</span>${entry.label}`;
+        }
+
+        const es = new EventSource('/scan_stream/' + encodeURIComponent(domain));
+        let prev = null;
+
+        es.onmessage = function(e) {
+            const d = JSON.parse(e.data);
+
+            if (prev && prev !== d.step) markDone(prev);
+
+            if (d.step === 'done') {
+                fill.style.width = '100%';
+                pct.textContent  = '100%';
+                lbl.textContent  = 'Complete';
+                status.innerHTML = '<span>&gt;&gt;</span> Scan complete — redirecting...';
+                es.close();
+                setTimeout(() => { window.location.href = '/scan_result/' + encodeURIComponent(domain); }, 900);
+                return;
+            }
+
+            addItem(d.step, d.label);
+            fill.style.width = d.progress + '%';
+            pct.textContent  = d.progress + '%';
+            lbl.textContent  = d.label;
+            status.innerHTML = `<span>&gt;&gt;</span> Running: ${d.label}`;
+            prev = d.step;
+        };
+
+        es.onerror = function() {
+            status.innerHTML = '<span style="color:#ff4466">&gt;&gt;</span> Connection error. Please try again.';
+            es.close();
+        };
+    </script>
+</body>
+</html>

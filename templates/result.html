@@ -3,578 +3,961 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scan Results - {{ domain }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>CYBERSCAN.AI — {{ domain }}</title>
+    <style>
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+        body {
+            font-family: 'Segoe UI', 'Courier New', monospace;
+            background: #020c1b;
+            color: #a8d8f0;
+            min-height: 100vh;
+        }
+
+        /* ── Background: hex grid + radial glow ── */
+        body::before {
+            content: '';
+            position: fixed; inset: 0; z-index: 0;
+            background:
+                radial-gradient(ellipse 70% 50% at 30% 20%, rgba(0,80,180,.18) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 40% at 80% 70%, rgba(255,100,0,.07) 0%, transparent 55%),
+                linear-gradient(160deg, #020c1b 0%, #041428 50%, #020c1b 100%);
+            pointer-events: none;
+        }
+
+        /* Hex dot pattern */
+        body::after {
+            content: '';
+            position: fixed; inset: 0; z-index: 0;
+            background-image: radial-gradient(circle, rgba(0,180,255,.07) 1px, transparent 1px);
+            background-size: 32px 32px;
+            pointer-events: none;
+        }
+
+        /* ── Top nav bar ── */
+        .topbar {
+            position: relative; z-index: 10;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 32px;
+            background: rgba(2,12,27,.85);
+            border-bottom: 1px solid rgba(0,180,255,.15);
+            backdrop-filter: blur(10px);
+            flex-wrap: wrap; gap: 12px;
+        }
+
+        .topbar-brand {
+            font-size: .8em; letter-spacing: 3px;
+            color: #00b4ff;
+            text-shadow: 0 0 12px rgba(0,180,255,.5);
+            font-weight: 700;
+        }
+
+        .topbar-domain {
+            font-size: .85em; color: rgba(168,216,240,.5);
+            letter-spacing: 1px;
+        }
+
+        .topbar-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        .btn { 
+            padding: 7px 16px; border-radius: 4px; font-size: .75em;
+            font-family: inherit; cursor: pointer; text-decoration: none;
+            letter-spacing: 1px; font-weight: 600; transition: all .2s;
+            border: 1px solid rgba(0,180,255,.3);
+            color: #00b4ff; background: rgba(0,180,255,.08);
+        }
+        .btn:hover { background: rgba(0,180,255,.18); border-color: #00b4ff; }
+        .btn-home { color: rgba(168,216,240,.6); border-color: rgba(168,216,240,.15); background: transparent; }
+        .btn-home:hover { color: #00b4ff; border-color: rgba(0,180,255,.3); }
+
+        /* ── Page wrapper ── */
+        .page { position: relative; z-index: 1; max-width: 1300px; margin: 0 auto; padding: 32px 24px 60px; }
+
+        /* ── Section heading ── */
+        .sec-title {
+            display: flex; align-items: center; gap: 10px;
+            font-size: .78em; letter-spacing: 3px; text-transform: uppercase;
+            color: rgba(0,180,255,.5); margin: 40px 0 16px;
+        }
+        .sec-title::after {
+            content: ''; flex: 1; height: 1px;
+            background: linear-gradient(90deg, rgba(0,180,255,.2), transparent);
+        }
+
+        /* ── Cards ── */
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+        .cards.wide { grid-template-columns: 1fr; }
+        .cards.two  { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }
+
+        .card {
+            background: rgba(4,20,40,.7);
+            border: 1px solid rgba(0,180,255,.12);
+            border-radius: 10px;
+            padding: 20px 22px;
+            backdrop-filter: blur(6px);
+            transition: border-color .25s, box-shadow .25s, transform .25s;
+            position: relative; overflow: hidden;
+        }
+        .card::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(0,180,255,.4), transparent);
+        }
+        .card:hover {
+            border-color: rgba(0,180,255,.3);
+            box-shadow: 0 0 24px rgba(0,180,255,.08);
+            transform: translateY(-2px);
+        }
+
+        /* Orange accent card (threats/warnings) */
+        .card.threat {
+            border-color: rgba(255,120,0,.2);
+        }
+        .card.threat::before {
+            background: linear-gradient(90deg, transparent, rgba(255,120,0,.5), transparent);
+        }
+        .card.threat:hover { border-color: rgba(255,120,0,.4); box-shadow: 0 0 24px rgba(255,120,0,.08); }
+
+        /* Green accent card (safe) */
+        .card.safe { border-color: rgba(0,220,130,.15); }
+        .card.safe::before { background: linear-gradient(90deg, transparent, rgba(0,220,130,.4), transparent); }
+
+        .card-head {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 14px;
+        }
+        .card-icon { font-size: 1.2em; }
+        .card-title { font-size: .82em; letter-spacing: 2px; text-transform: uppercase; color: #00b4ff; font-weight: 700; }
+        .card.threat .card-title { color: #ff8c42; }
+        .card.safe   .card-title { color: #00dc82; }
+
+        /* ── CVSS hero ── */
+        .cvss-hero {
+            display: flex; align-items: center; gap: 28px;
+            padding: 24px; margin-bottom: 16px;
+            background: rgba(0,0,0,.3); border-radius: 8px;
+            border: 1px solid rgba(0,180,255,.1);
+        }
+        .cvss-ring {
+            width: 90px; height: 90px; border-radius: 50%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border: 3px solid #00b4ff;
+            box-shadow: 0 0 20px rgba(0,180,255,.4), inset 0 0 20px rgba(0,180,255,.05);
+            flex-shrink: 0;
+        }
+        .cvss-ring.warning { border-color: #ffaa00; box-shadow: 0 0 20px rgba(255,170,0,.4), inset 0 0 20px rgba(255,170,0,.05); }
+        .cvss-ring.danger  { border-color: #ff6600; box-shadow: 0 0 20px rgba(255,100,0,.4), inset 0 0 20px rgba(255,100,0,.05); }
+        .cvss-ring.critical{ border-color: #ff2255; box-shadow: 0 0 20px rgba(255,34,85,.4),  inset 0 0 20px rgba(255,34,85,.05); }
+        .cvss-ring.success { border-color: #00dc82; box-shadow: 0 0 20px rgba(0,220,130,.4), inset 0 0 20px rgba(0,220,130,.05); }
+
+        .cvss-num { font-size: 1.8em; font-weight: 900; color: #00b4ff; line-height: 1; }
+        .cvss-ring.warning .cvss-num { color: #ffaa00; }
+        .cvss-ring.danger  .cvss-num { color: #ff6600; }
+        .cvss-ring.critical .cvss-num { color: #ff2255; }
+        .cvss-ring.success  .cvss-num { color: #00dc82; }
+        .cvss-label { font-size: .55em; letter-spacing: 1px; color: rgba(168,216,240,.5); }
+
+        .cvss-sev { font-size: 1.1em; font-weight: 700; letter-spacing: 2px; color: #00b4ff; margin-bottom: 6px; }
+
+        /* ── Data rows ── */
+        .data-row {
+            display: flex; gap: 8px; padding: 7px 0;
+            border-bottom: 1px solid rgba(0,180,255,.06);
+            font-size: .82em; flex-wrap: wrap;
+        }
+        .data-row:last-child { border-bottom: none; }
+        .data-key { color: rgba(0,180,255,.6); min-width: 130px; flex-shrink: 0; }
+        .data-val { color: #c8e8ff; word-break: break-all; }
+
+        /* ── Tags / badges ── */
+        .tag {
+            display: inline-block; padding: 3px 10px; border-radius: 12px;
+            font-size: .72em; font-weight: 600; letter-spacing: .5px; margin: 3px 3px 3px 0;
+        }
+        .tag-cyan   { background: rgba(0,180,255,.12); color: #00b4ff; border: 1px solid rgba(0,180,255,.25); }
+        .tag-orange { background: rgba(255,120,0,.12);  color: #ff8c42; border: 1px solid rgba(255,120,0,.25); }
+        .tag-green  { background: rgba(0,220,130,.1);   color: #00dc82; border: 1px solid rgba(0,220,130,.2); }
+        .tag-red    { background: rgba(255,50,80,.1);   color: #ff4466; border: 1px solid rgba(255,50,80,.2); }
+
+        /* ── Table ── */
+        .r-table { width: 100%; border-collapse: collapse; font-size: .8em; margin-top: 10px; }
+        .r-table th {
+            text-align: left; padding: 8px 12px;
+            background: rgba(0,180,255,.08); color: #00b4ff;
+            letter-spacing: 1.5px; font-size: .75em; text-transform: uppercase;
+            border-bottom: 1px solid rgba(0,180,255,.15);
+        }
+        .r-table td { padding: 8px 12px; border-bottom: 1px solid rgba(0,180,255,.06); color: #a8d8f0; }
+        .r-table tr:hover td { background: rgba(0,180,255,.04); }
+
+        /* ── Progress bar ── */
+        .prog-wrap { background: rgba(0,180,255,.07); border-radius: 3px; height: 6px; margin: 8px 0; overflow: hidden; }
+        .prog-fill { height: 100%; background: linear-gradient(90deg, #0050ff, #00b4ff, #00ffcc); border-radius: 3px; box-shadow: 0 0 8px rgba(0,180,255,.5); }
+
+        /* ── Code ── */
+        code {
+            background: rgba(0,0,0,.4); padding: 2px 7px; border-radius: 3px;
+            color: #ff8c42; font-family: 'Courier New', monospace; font-size: .85em;
+            border: 1px solid rgba(255,120,0,.15);
+        }
+        pre {
+            background: rgba(0,0,0,.5); padding: 12px; border-radius: 6px;
+            color: #a8d8f0; font-size: .78em; overflow-x: auto;
+            border: 1px solid rgba(0,180,255,.1);
+        }
+
+        /* ── Info / warning box ── */
+        .info-box {
+            background: rgba(255,170,0,.06); border: 1px solid rgba(255,170,0,.2);
+            border-left: 3px solid #ffaa00; padding: 12px 16px; border-radius: 6px;
+            font-size: .82em; color: rgba(255,200,100,.8);
+        }
+
+        /* ── Findings list ── */
+        .finding-item {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 8px 0; border-bottom: 1px solid rgba(255,120,0,.08);
+            font-size: .8em; color: rgba(255,180,100,.8);
+        }
+        .finding-item::before { content: '▸'; color: #ff8c42; flex-shrink: 0; margin-top: 1px; }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,.3); }
+        ::-webkit-scrollbar-thumb { background: rgba(0,180,255,.3); border-radius: 3px; }
+
+        @media (max-width: 640px) {
+            .topbar { padding: 12px 16px; }
+            .page { padding: 20px 14px 40px; }
+            .cards, .cards.two { grid-template-columns: 1fr; }
+            .cvss-hero { flex-direction: column; text-align: center; }
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Scan Results: {{ domain }}</h1>
-            <a href="/" class="back-link">← Back to Home</a>
-            <div class="export-buttons">
-                <a href="/export/json/{{ domain }}" class="btn-export">📄 Export JSON</a>
-                <a href="/export/xml/{{ domain }}" class="btn-export">📋 Export XML</a>
-                <a href="/export/pdf/{{ domain }}" class="btn-export">📕 Export PDF</a>
-            </div>
-        </header>
-        
-        <main>
-            <!-- CVSS Risk Score Section -->
-            <section class="result-section cvss-section">
-                <h2>⚠️ CVSS Risk Score</h2>
-                <div class="cvss-score {{ cvss.color }}">
-                    <div class="score-value">{{ cvss.score }}</div>
-                    <div class="score-severity">{{ cvss.severity }}</div>
-                </div>
-                {% if cvss.findings %}
-                <div class="findings">
-                    <h3>Security Findings ({{ cvss.total_findings }})</h3>
-                    <ul>
-                        {% for finding in cvss.findings %}
-                        <li>{{ finding }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% else %}
-                <p class="no-findings">✅ No major security issues detected</p>
-                {% endif %}
-            </section>
-            <section class="result-section">
-                <h2>🔐 SSL Certificate</h2>
-                {% if ssl.valid %}
-                <p><strong>Status:</strong> ✅ Valid</p>
-                <p><strong>Issuer:</strong> {{ ssl.issuer }}</p>
-                <p><strong>Expiry:</strong> {{ ssl.expiry }}</p>
-                <p><strong>Subject:</strong> {{ ssl.subject }}</p>
-                {% else %}
-                <p><strong>Status:</strong> ❌ Invalid</p>
-                <p><strong>Error:</strong> {{ ssl.error }}</p>
-                {% endif %}
-            </section>
-            
-            <section class="result-section">
-                <h2>🛡 Security Headers</h2>
-                {% if headers.error %}
-                <p>Error: {{ headers.error }}</p>
-                {% else %}
-                <ul>
-                    {% for key, value in headers.items() %}
-                    <li><strong>{{ key }}:</strong> {{ value }}</li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
-            </section>
-            
-            <section class="result-section">
-                <h2>🎣 Phishing Detection</h2>
-                <p><strong>Risk Score:</strong> {{ phishing.score }}/100</p>
-                <p><strong>Risk Level:</strong> {{ phishing.risk_level }}</p>
-                <p><strong>Indicators:</strong></p>
-                <ul>
-                    {% for indicator in phishing.indicators %}
-                    <li>{{ indicator }}</li>
-                    {% else %}
-                    <li>No suspicious indicators found</li>
-                    {% endfor %}
-                </ul>
-            </section>
-            
-            <section class="result-section">
-                <h2>📡 DNS Information</h2>
-                {% if dns.error %}
-                <p>Error: {{ dns.error }}</p>
-                {% else %}
-                <p><strong>IP Address:</strong> {{ dns.ip }}</p>
-                {% for record_type in ['A', 'MX', 'TXT', 'NS'] %}
-                {% if dns[record_type] %}
-                <p><strong>{{ record_type }} Records:</strong></p>
-                <ul>
-                    {% for record in dns[record_type] %}
-                    <li>{{ record }}</li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
-                {% endfor %}
-                {% endif %}
-            </section>
-            
-            <section class="result-section">
-                <h2>📜 WHOIS Information</h2>
-                {% if whois.error %}
-                <p>Error: {{ whois.error }}</p>
-                {% else %}
-                <p><strong>Domain Name:</strong> {{ whois.domain_name }}</p>
-                <p><strong>Registrar:</strong> {{ whois.registrar }}</p>
-                <p><strong>Creation Date:</strong> {{ whois.creation_date }}</p>
-                <p><strong>Expiration Date:</strong> {{ whois.expiration_date }}</p>
-                <p><strong>Domain Age:</strong> {{ whois.age_days }} days</p>
-                {% if whois.name_servers %}
-                <p><strong>Name Servers:</strong></p>
-                <ul>
-                    {% for ns in whois.name_servers %}
-                    <li>{{ ns }}</li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
-                {% if whois.emails %}
-                <p><strong>Registrant Email:</strong></p>
-                <ul>
-                    {% for email in whois.emails %}
-                    <li>{{ email }}</li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
-                {% endif %}
-            </section>
-            
-            <section class="result-section">
-                <h2>🌐 Subdomains Found</h2>
-                {% if subdomains %}
-                <ul>
-                    {% for subdomain in subdomains %}
-                    <li>{{ subdomain }}</li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <p>No common subdomains found</p>
-                {% endif %}
-            </section>
-            
-            <!-- Open Ports Section -->
-            <section class="result-section">
-                <h2>🔌 Open Ports</h2>
-                {% if ports.error %}
-                <p>Error: {{ ports.error }}</p>
-                {% elif ports.open_ports %}
-                <p><strong>Total Open Ports:</strong> {{ ports.total_open }}</p>
-                <table class="ports-table">
-                    <thead>
-                        <tr>
-                            <th>Port</th>
-                            <th>Service</th>
-                            <th>State</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for port in ports.open_ports %}
-                        <tr>
-                            <td>{{ port.port }}</td>
-                            <td>{{ port.service }}</td>
-                            <td><span class="badge-open">{{ port.state }}</span></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <p>No common ports are open</p>
-                {% endif %}
-            </section>
-            
-            <!-- IP Geolocation Section -->
-            <section class="result-section">
-                <h2>🌍 IP Geolocation</h2>
-                {% if ip_info.error %}
-                <p>Error: {{ ip_info.error }}</p>
-                {% else %}
-                <p><strong>IP Address:</strong> {{ ip_info.ip }}</p>
-                <p><strong>Location:</strong> {{ ip_info.city }}, {{ ip_info.region }}, {{ ip_info.country }} ({{ ip_info.country_code }})</p>
-                <p><strong>Coordinates:</strong> {{ ip_info.lat }}, {{ ip_info.lon }}</p>
-                <p><strong>Timezone:</strong> {{ ip_info.timezone }}</p>
-                <p><strong>ISP:</strong> {{ ip_info.isp }}</p>
-                <p><strong>Organization:</strong> {{ ip_info.org }}</p>
-                <p><strong>ASN:</strong> {{ ip_info.asn }}</p>
-                {% endif %}
-            </section>
-            
-            <!-- CDN Detection Section -->
-            <section class="result-section">
-                <h2>☁️ CDN Detection</h2>
-                {% if cdn_info.cdn_detected %}
-                <p><strong>CDN Detected:</strong> ✅ Yes</p>
-                <p><strong>Provider:</strong> {{ cdn_info.provider|upper }}</p>
-                {% if cdn_info.cname %}
-                <p><strong>CNAME:</strong> {{ cdn_info.cname }}</p>
-                {% endif %}
-                {% if cdn_info.headers %}
-                <p><strong>CDN Headers:</strong></p>
-                <ul>
-                    {% for key, value in cdn_info.headers.items() %}
-                    <li><strong>{{ key }}:</strong> {{ value }}</li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
-                {% else %}
-                <p><strong>CDN Detected:</strong> ❌ No</p>
-                {% endif %}
-            </section>
-            
-            <!-- Traceroute Section -->
-            <section class="result-section">
-                <h2>🛤️ Network Traceroute</h2>
-                {% if traceroute.error %}
-                <div class="info-box">
-                    <p>⚠️ {{ traceroute.error }}</p>
-                    <p style="font-size: 12px; color: #666; margin-top: 10px;">
-                        Note: Traceroute may be blocked by firewalls or network policies. This is normal and doesn't affect other scan results.
-                    </p>
-                </div>
-                {% elif traceroute.hops %}
-                <p><strong>Total Hops:</strong> {{ traceroute.total_hops }}</p>
-                <p><strong>Target IP:</strong> {{ traceroute.ip }}</p>
-                <table class="traceroute-table">
-                    <thead>
-                        <tr>
-                            <th>Hop</th>
-                            <th>IP Address</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for hop in traceroute.hops %}
-                        <tr>
-                            <td>{{ hop.hop }}</td>
-                            <td>{{ hop.ip }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <div class="info-box">
-                    <p>ℹ️ No traceroute data available</p>
-                    <p style="font-size: 12px; color: #666; margin-top: 10px;">
-                        Traceroute may be blocked by network policies or firewalls.
-                    </p>
-                </div>
-                {% endif %}
-            </section>
-            
-            <!-- HTTP Header Analysis Section -->
-            <section class="result-section">
-                <h2>📊 HTTP Header Analysis</h2>
-                {% if http_analysis.error %}
-                <p>Error: {{ http_analysis.error }}</p>
-                {% else %}
-                <div class="security-score-box">
-                    <h3>Security Score: {{ http_analysis.security_percentage }}%</h3>
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: {{ http_analysis.security_percentage }}%"></div>
-                    </div>
-                    <p><strong>Rating:</strong> {{ http_analysis.security_rating }}</p>
-                    <p><strong>Score:</strong> {{ http_analysis.security_score }}/{{ http_analysis.max_score }}</p>
-                </div>
-                
-                {% if http_analysis.response_time_ms %}
-                <p><strong>Response Time:</strong> {{ http_analysis.response_time_ms }}ms</p>
-                {% endif %}
-                
-                {% if http_analysis.vulnerabilities %}
-                <div class="vulnerabilities-box">
-                    <h4>⚠️ Vulnerabilities Found ({{ http_analysis.vulnerabilities|length }})</h4>
-                    <ul>
-                        {% for vuln in http_analysis.vulnerabilities %}
-                        <li>{{ vuln }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
-                
-                {% if http_analysis.recommendations %}
-                <div class="recommendations-box">
-                    <h4>💡 Recommendations ({{ http_analysis.recommendations|length }})</h4>
-                    <ul>
-                        {% for rec in http_analysis.recommendations %}
-                        <li>{{ rec }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
-                {% endif %}
-            </section>
-            
-            <!-- Technology Stack Section -->
-            <section class="result-section">
-                <h2>🔧 Technology Stack</h2>
-                {% if tech_stack.error %}
-                <p>Error: {{ tech_stack.error }}</p>
-                {% else %}
-                <p><strong>Total Technologies Detected:</strong> {{ tech_stack.total_detected }}</p>
-                
-                {% if tech_stack.responsive is defined %}
-                <p><strong>Responsive Design:</strong> {{ 'Yes ✅' if tech_stack.responsive else 'No ❌' }}</p>
-                {% endif %}
-                
-                {% for category, technologies in tech_stack.technologies.items() %}
-                <div class="tech-category">
-                    <h4>{{ category|title }}</h4>
-                    <div class="tech-badges">
-                        {% for tech in technologies %}
-                        <span class="tech-badge">{{ tech }}</span>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endfor %}
-                {% endif %}
-            </section>
-            
-            <!-- Directory Enumeration Section -->
-            <section class="result-section">
-                <h2>📁 Directory Enumeration</h2>
-                {% if directories.error %}
-                <p>Error: {{ directories.error }}</p>
-                {% else %}
-                <p><strong>Paths Checked:</strong> {{ directories.total_checked }}</p>
-                <p><strong>Paths Found:</strong> {{ directories.total_found }}</p>
-                
-                {% if directories.categories %}
-                    {% if directories.categories.accessible %}
-                    <div class="dir-category">
-                        <h4>✅ Accessible ({{ directories.categories.accessible|length }})</h4>
-                        <ul>
-                            {% set ns = namespace(count=0) %}
-                            {% for path in directories.categories.accessible %}
-                            {% if ns.count < 10 %}
-                            <li><code>{{ path.path }}</code> - Status: {{ path.status }}</li>
-                            {% set ns.count = ns.count + 1 %}
-                            {% endif %}
-                            {% endfor %}
-                            {% if directories.categories.accessible|length > 10 %}
-                            <li><em>... and {{ directories.categories.accessible|length - 10 }} more</em></li>
-                            {% endif %}
-                        </ul>
-                    </div>
-                    {% endif %}
-                    
-                    {% if directories.categories.forbidden %}
-                    <div class="dir-category">
-                        <h4>🔒 Forbidden ({{ directories.categories.forbidden|length }})</h4>
-                        <ul>
-                            {% set ns = namespace(count=0) %}
-                            {% for path in directories.categories.forbidden %}
-                            {% if ns.count < 5 %}
-                            <li><code>{{ path.path }}</code> - Status: {{ path.status }}</li>
-                            {% set ns.count = ns.count + 1 %}
-                            {% endif %}
-                            {% endfor %}
-                            {% if directories.categories.forbidden|length > 5 %}
-                            <li><em>... and {{ directories.categories.forbidden|length - 5 }} more</em></li>
-                            {% endif %}
-                        </ul>
-                    </div>
-                    {% endif %}
-                    
-                    {% if directories.categories.redirects %}
-                    <div class="dir-category">
-                        <h4>↪️ Redirects ({{ directories.categories.redirects|length }})</h4>
-                        <ul>
-                            {% set ns = namespace(count=0) %}
-                            {% for path in directories.categories.redirects %}
-                            {% if ns.count < 5 %}
-                            <li><code>{{ path.path }}</code> - Status: {{ path.status }}</li>
-                            {% set ns.count = ns.count + 1 %}
-                            {% endif %}
-                            {% endfor %}
-                            {% if directories.categories.redirects|length > 5 %}
-                            <li><em>... and {{ directories.categories.redirects|length - 5 }} more</em></li>
-                            {% endif %}
-                        </ul>
-                    </div>
-                    {% endif %}
-                {% else %}
-                <p>No common directories or files found</p>
-                {% endif %}
-                {% endif %}
-            </section>
-            
-            <!-- Email Harvesting Section -->
-            <section class="result-section">
-                <h2>📧 Email Harvesting</h2>
-                {% if emails.error %}
-                <p>Error: {{ emails.error }}</p>
-                {% else %}
-                <p><strong>Total Emails Found:</strong> {{ emails.total_found }}</p>
-                {% if emails.emails %}
-                <ul>
-                    {% for email in emails.emails %}
-                    <li>
-                        <code>{{ email }}</code>
-                        {% if emails.sources[email] %}
-                        <span class="email-source">({{ emails.sources[email] }})</span>
-                        {% endif %}
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <p>No email addresses found</p>
-                {% endif %}
-                {% endif %}
-            </section>
-            
-            <!-- WAF Detection Section -->
-            <section class="result-section">
-                <h2>🛡️ WAF Detection</h2>
-                {% if waf_info.error %}
-                <p>Error: {{ waf_info.error }}</p>
-                {% else %}
-                {% if waf_info.waf_detected %}
-                <div class="waf-detected">
-                    <p><strong>WAF Detected:</strong> ✅ Yes</p>
-                    <p><strong>WAF Name:</strong> {{ waf_info.waf_name }}</p>
-                    <p><strong>Confidence:</strong> <span class="confidence-{{ waf_info.confidence|lower }}">{{ waf_info.confidence }}</span></p>
-                    
-                    {% if waf_info.indicators %}
-                    <h4>Indicators:</h4>
-                    <ul>
-                        {% for indicator in waf_info.indicators %}
-                        <li>{{ indicator }}</li>
-                        {% endfor %}
-                    </ul>
-                    {% endif %}
-                    
-                    {% if waf_info.possible_wafs and waf_info.possible_wafs|length > 1 %}
-                    <h4>Other Possible WAFs:</h4>
-                    <ul>
-                        {% set ns = namespace(count=0) %}
-                        {% for waf in waf_info.possible_wafs %}
-                        {% if ns.count > 0 and ns.count < 5 %}
-                        <li>{{ waf.name }} (Score: {{ waf.score }})</li>
-                        {% endif %}
-                        {% set ns.count = ns.count + 1 %}
-                        {% endfor %}
-                    </ul>
-                    {% endif %}
-                </div>
-                {% else %}
-                <p><strong>WAF Detected:</strong> ❌ No</p>
-                <p>No Web Application Firewall detected</p>
-                {% endif %}
-                {% endif %}
-            </section>
-            
-            <!-- Website Fingerprinting Section -->
-            <section class="result-section">
-                <h2>🔍 Website Fingerprinting</h2>
-                {% if fingerprint.error %}
-                <p>Error: {{ fingerprint.error }}</p>
-                {% else %}
-                
-                {% if fingerprint.fingerprints %}
-                <div class="fingerprint-box">
-                    <h4>Digital Fingerprints:</h4>
-                    {% for key, value in fingerprint.fingerprints.items() %}
-                    <p><strong>{{ key|replace('_', ' ')|title }}:</strong> <code>{{ value if value is string else value|tojson }}</code></p>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                
-                {% if fingerprint.signatures %}
-                <div class="signatures-box">
-                    <h4>Identified Signatures:</h4>
-                    <ul>
-                        {% for sig in fingerprint.signatures %}
-                        <li>{{ sig }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
-                
-                {% if fingerprint.characteristics %}
-                <div class="characteristics-box">
-                    <h4>Website Characteristics:</h4>
-                    {% for key, value in fingerprint.characteristics.items() %}
-                    {% if value is string or value is number %}
-                    <p><strong>{{ key|replace('_', ' ')|title }}:</strong> {{ value }}</p>
-                    {% elif value is iterable and value is not string %}
-                    <p><strong>{{ key|replace('_', ' ')|title }}:</strong></p>
-                    <ul>
-                        {% set ns = namespace(count=0) %}
-                        {% for item in value %}
-                        {% if ns.count < 10 %}
-                        <li>{{ item if item is string else item|tojson }}</li>
-                        {% set ns.count = ns.count + 1 %}
-                        {% endif %}
-                        {% endfor %}
-                        {% if value|length > 10 %}
-                        <li><em>... and {{ value|length - 10 }} more</em></li>
-                        {% endif %}
-                    </ul>
-                    {% endif %}
-                    {% endfor %}
-                </div>
-                {% endif %}
-                {% endif %}
-            </section>
-            
-            <!-- Server Banners Section -->
-            <section class="result-section">
-                <h2>🏷️ Server Banners</h2>
-                {% if banners.error %}
-                <p>Error: {{ banners.error }}</p>
-                {% else %}
-                {% if banners.ip %}
-                <p><strong>IP Address:</strong> {{ banners.ip }}</p>
-                {% endif %}
-                
-                {% if banners.http_banner %}
-                <div class="banner-box">
-                    <h4>HTTP Headers:</h4>
-                    {% for header, value in banners.http_banner.items() %}
-                    <p><strong>{{ header }}:</strong> <code>{{ value }}</code></p>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                
-                {% if banners.server_info %}
-                <div class="banner-box">
-                    <h4>Server Information:</h4>
-                    {% for key, value in banners.server_info.items() %}
-                    <p><strong>{{ key|title }}:</strong> {{ value }}</p>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                
-                {% if banners.service_banners %}
-                <div class="banner-box">
-                    <h4>Service Banners:</h4>
-                    {% for service, banner in banners.service_banners.items() %}
-                    <p><strong>{{ service }}:</strong></p>
-                    <pre>{{ banner }}</pre>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                
-                {% if not banners.http_banner and not banners.service_banners %}
-                <p>No banners retrieved</p>
-                {% endif %}
-                {% endif %}
-            </section>
-            
-            <!-- Reverse IP Lookup Section -->
-            <section class="result-section">
-                <h2>🔄 Reverse IP Lookup</h2>
-                {% if reverse_ip.error %}
-                <p>Error: {{ reverse_ip.error }}</p>
-                {% else %}
-                <p><strong>IP Address:</strong> {{ reverse_ip.ip }}</p>
-                <p><strong>Domains on Same IP:</strong> {{ reverse_ip.total_domains }}</p>
-                
-                {% if reverse_ip.domains_on_ip %}
-                <ul>
-                    {% set ns = namespace(count=0) %}
-                    {% for domain in reverse_ip.domains_on_ip %}
-                    {% if ns.count < 20 %}
-                    <li><code>{{ domain }}</code></li>
-                    {% set ns.count = ns.count + 1 %}
-                    {% endif %}
-                    {% endfor %}
-                    {% if reverse_ip.domains_on_ip|length > 20 %}
-                    <li><em>... and {{ reverse_ip.domains_on_ip|length - 20 }} more</em></li>
-                    {% endif %}
-                </ul>
-                {% else %}
-                <p>{{ reverse_ip.note if reverse_ip.note else 'No other domains found' }}</p>
-                {% endif %}
-                {% endif %}
-            </section>
-        </main>
+
+<!-- Top bar -->
+<nav class="topbar">
+    <span class="topbar-brand">⬡ CYBERSCAN.AI</span>
+    <span class="topbar-domain">// {{ domain }}</span>
+    <div class="topbar-actions">
+        <a href="/" class="btn btn-home">← HOME</a>
+        <a href="/export/json/{{ domain }}" class="btn">JSON</a>
+        <a href="/export/xml/{{ domain }}"  class="btn">XML</a>
+        <a href="/export/pdf/{{ domain }}"  class="btn">PDF</a>
     </div>
+</nav>
+
+<div class="page">
+
+    <!-- ══ CVSS ══ -->
+    <div class="sec-title">⬡ Risk Assessment</div>
+    <div class="cards wide">
+      <div class="card {% if cvss.color == 'success' %}safe{% elif cvss.color in ['danger','critical'] %}threat{% endif %}">
+        <div class="card-head">
+            <span class="card-icon">⚠️</span>
+            <span class="card-title">CVSS Risk Score</span>
+        </div>
+        <div class="cvss-hero">
+            <div class="cvss-ring {{ cvss.color }}">
+                <span class="cvss-num">{{ cvss.score }}</span>
+                <span class="cvss-label">/ 10</span>
+            </div>
+            <div>
+                <div class="cvss-sev">{{ cvss.severity }}</div>
+                <div style="font-size:.78em;color:rgba(168,216,240,.5);">{{ cvss.total_findings }} finding(s) detected</div>
+            </div>
+        </div>
+        {% if cvss.findings %}
+            {% for f in cvss.findings %}
+            <div class="finding-item">{{ f }}</div>
+            {% endfor %}
+        {% else %}
+            <div style="color:#00dc82;font-size:.82em;padding:8px 0;">✓ No major security issues detected</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ══ AI Solutions ══ -->
+    <div class="sec-title">⬡ AI Security Solutions</div>
+    <div class="cards wide">
+      <div class="card" id="aiSolutionsCard">
+        <div class="card-head">
+            <span class="card-icon">🤖</span>
+            <span class="card-title">AI-Powered Remediation</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+                <span style="font-size:.65em;color:rgba(0,180,255,.4);letter-spacing:1px;">GROQ · LLAMA 3</span>
+                <button id="aiRunBtn" onclick="runAIScan()" style="
+                    padding:5px 14px;border-radius:4px;border:1px solid rgba(0,180,255,.35);
+                    background:rgba(0,180,255,.1);color:#00b4ff;font-size:.72em;
+                    font-family:inherit;cursor:pointer;letter-spacing:1px;transition:all .2s;">
+                    ▶ ANALYZE
+                </button>
+            </span>
+        </div>
+        <div id="aiIdle" style="padding:20px 0;text-align:center;">
+            <div style="font-size:2em;margin-bottom:10px;">🛡️</div>
+            <div style="font-size:.82em;color:rgba(168,216,240,.4);letter-spacing:1px;">Click ANALYZE to get AI-generated security fixes for this domain</div>
+        </div>
+        <div id="aiLoading" style="display:none;padding:20px 0;text-align:center;">
+            <div style="display:inline-flex;gap:6px;align-items:center;">
+                <span class="ai-dot"></span><span class="ai-dot"></span><span class="ai-dot"></span>
+            </div>
+            <div style="font-size:.78em;color:rgba(0,180,255,.5);margin-top:10px;letter-spacing:1px;">AI analyzing scan results...</div>
+        </div>
+        <div id="aiOutput" style="display:none;">
+            <div id="aiText" style="font-size:.82em;line-height:1.8;color:#c8e8ff;white-space:pre-wrap;word-break:break-word;"></div>
+        </div>
+        <div id="aiError" style="display:none;" class="info-box"></div>
+      </div>
+    </div>
+
+    <style>
+        .ai-dot{width:8px;height:8px;border-radius:50%;background:#00b4ff;animation:aiPulse 1.2s ease-in-out infinite;}
+        .ai-dot:nth-child(2){animation-delay:.2s;}.ai-dot:nth-child(3){animation-delay:.4s;}
+        @keyframes aiPulse{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+        #aiText h1,#aiText h2,#aiText h3{color:#00b4ff;margin:14px 0 6px;letter-spacing:1px;}
+        #aiText h2{font-size:.95em;border-bottom:1px solid rgba(0,180,255,.15);padding-bottom:4px;}
+        #aiText h3{font-size:.88em;color:#00e5ff;}
+        #aiText strong{color:#fff;}
+        #aiText code{background:rgba(0,0,0,.4);padding:1px 6px;border-radius:3px;color:#ff8c42;font-family:'Courier New',monospace;font-size:.9em;}
+        #aiText ul,#aiText ol{padding-left:20px;margin:6px 0;}
+        #aiText li{margin:4px 0;color:rgba(168,216,240,.8);}
+        #aiText p{margin:6px 0;}
+    </style>
+
+    <!-- ══ Security ══ -->
+    <div class="sec-title">⬡ Security Analysis</div>
+    <div class="cards two">
+
+      <!-- SSL -->
+      <div class="card {% if ssl.valid %}safe{% else %}threat{% endif %}">
+        <div class="card-head"><span class="card-icon">🔒</span><span class="card-title">SSL Certificate</span></div>
+        {% if ssl.valid %}
+        <div class="data-row"><span class="data-key">Status</span><span class="data-val"><span class="tag tag-green">✓ Valid</span></span></div>
+        <div class="data-row"><span class="data-key">Issuer</span><span class="data-val">{{ ssl.issuer }}</span></div>
+        <div class="data-row"><span class="data-key">Expiry</span><span class="data-val">{{ ssl.expiry }}</span></div>
+        <div class="data-row"><span class="data-key">Subject</span><span class="data-val">{{ ssl.subject }}</span></div>
+        {% else %}
+        <div class="data-row"><span class="data-key">Status</span><span class="data-val"><span class="tag tag-red">✗ Invalid</span></span></div>
+        <div class="data-row"><span class="data-key">Error</span><span class="data-val">{{ ssl.error }}</span></div>
+        {% endif %}
+      </div>
+
+      <!-- Security Headers -->
+      <div class="card">
+        <div class="card-head"><span class="card-icon">🛡</span><span class="card-title">Security Headers</span></div>
+        {% if headers.error %}
+        <div class="info-box">{{ headers.error }}</div>
+        {% else %}
+        {% for key, value in headers.items() %}
+        <div class="data-row"><span class="data-key">{{ key }}</span><span class="data-val">{{ value }}</span></div>
+        {% endfor %}
+        {% endif %}
+      </div>
+
+      <!-- Phishing -->
+      <div class="card {% if phishing.score > 50 %}threat{% endif %}">
+        <div class="card-head"><span class="card-icon">🎣</span><span class="card-title">Phishing Detection</span></div>
+        <div class="data-row"><span class="data-key">Risk Score</span><span class="data-val"><span class="tag {% if phishing.score > 50 %}tag-orange{% else %}tag-green{% endif %}">{{ phishing.score }}/100</span></span></div>
+        <div class="data-row"><span class="data-key">Risk Level</span><span class="data-val">{{ phishing.risk_level }}</span></div>
+        {% if phishing.indicators %}
+        <div style="margin-top:10px;">
+            {% for ind in phishing.indicators %}<span class="tag tag-orange">{{ ind }}</span>{% endfor %}
+        </div>
+        {% endif %}
+        {% if phishing.virustotal and phishing.virustotal.checked %}
+        <div style="margin-top:14px;padding:10px 12px;background:rgba(0,0,0,.25);border:1px solid rgba(0,180,255,.1);border-radius:6px;">
+            <div style="font-size:.7em;letter-spacing:2px;color:rgba(0,180,255,.5);margin-bottom:8px;">VIRUSTOTAL</div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                <div style="text-align:center;">
+                    <div style="font-size:1.3em;font-weight:700;color:{% if phishing.virustotal.malicious > 0 %}#ff4466{% else %}#00dc82{% endif %};">{{ phishing.virustotal.malicious }}</div>
+                    <div style="font-size:.65em;color:rgba(168,216,240,.4);letter-spacing:1px;">MALICIOUS</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:1.3em;font-weight:700;color:{% if phishing.virustotal.suspicious > 0 %}#ffaa00{% else %}#a8d8f0{% endif %};">{{ phishing.virustotal.suspicious }}</div>
+                    <div style="font-size:.65em;color:rgba(168,216,240,.4);letter-spacing:1px;">SUSPICIOUS</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:1.3em;font-weight:700;color:#00dc82;">{{ phishing.virustotal.harmless }}</div>
+                    <div style="font-size:.65em;color:rgba(168,216,240,.4);letter-spacing:1px;">HARMLESS</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:1.3em;font-weight:700;color:rgba(168,216,240,.4);">{{ phishing.virustotal.undetected }}</div>
+                    <div style="font-size:.65em;color:rgba(168,216,240,.4);letter-spacing:1px;">UNDETECTED</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:1.3em;font-weight:700;color:{% if phishing.virustotal.reputation < -10 %}#ff4466{% elif phishing.virustotal.reputation > 0 %}#00dc82{% else %}#a8d8f0{% endif %};">{{ phishing.virustotal.reputation }}</div>
+                    <div style="font-size:.65em;color:rgba(168,216,240,.4);letter-spacing:1px;">REPUTATION</div>
+                </div>
+            </div>
+            {% if phishing.virustotal.categories %}
+            <div style="margin-top:8px;">{% for cat in phishing.virustotal.categories %}<span class="tag tag-cyan">{{ cat }}</span>{% endfor %}</div>
+            {% endif %}
+            {% if phishing.virustotal.note %}
+            <div style="font-size:.72em;color:rgba(168,216,240,.4);margin-top:6px;">{{ phishing.virustotal.note }}</div>
+            {% endif %}
+        </div>
+        {% elif phishing.virustotal and phishing.virustotal.error %}
+        <div style="margin-top:10px;font-size:.75em;color:rgba(255,170,0,.6);">⚠ VirusTotal: {{ phishing.virustotal.error }}</div>
+        {% endif %}
+      </div>
+
+      <!-- WAF -->
+      <div class="card {% if waf_info.waf_detected %}safe{% endif %}">
+        <div class="card-head"><span class="card-icon">🛡️</span><span class="card-title">WAF Detection</span></div>
+        {% if waf_info.error %}
+        <div class="info-box">{{ waf_info.error }}</div>
+        {% elif waf_info.waf_detected %}
+        <div class="data-row"><span class="data-key">WAF</span><span class="data-val"><span class="tag tag-green">✓ Detected</span></span></div>
+        <div class="data-row"><span class="data-key">Name</span><span class="data-val">{{ waf_info.waf_name }}</span></div>
+        <div class="data-row"><span class="data-key">Confidence</span><span class="data-val">{{ waf_info.confidence }}</span></div>
+        {% if waf_info.indicators %}{% for i in waf_info.indicators %}<div class="finding-item">{{ i }}</div>{% endfor %}{% endif %}
+        {% else %}
+        <div class="data-row"><span class="data-key">WAF</span><span class="data-val"><span class="tag tag-red">✗ Not Detected</span></span></div>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- ══ HTTP Analysis ══ -->
+    <div class="sec-title">⬡ HTTP Analysis</div>
+    <div class="cards wide">
+      <div class="card">
+        <div class="card-head"><span class="card-icon">📊</span><span class="card-title">HTTP Header Analysis</span></div>
+        {% if http_analysis.error %}
+        <div class="info-box">{{ http_analysis.error }}</div>
+        {% else %}
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap;">
+            <div style="font-size:2em;font-weight:900;color:#00b4ff;text-shadow:0 0 12px rgba(0,180,255,.5);">{{ http_analysis.security_percentage }}%</div>
+            <div>
+                <div style="font-size:.8em;color:#00b4ff;letter-spacing:1px;">{{ http_analysis.security_rating }}</div>
+                <div style="font-size:.72em;color:rgba(168,216,240,.4);">{{ http_analysis.security_score }}/{{ http_analysis.max_score }} points</div>
+            </div>
+        </div>
+        <div class="prog-wrap"><div class="prog-fill" style="width:{{ http_analysis.security_percentage }}%"></div></div>
+        {% if http_analysis.response_time_ms %}<div class="data-row"><span class="data-key">Response Time</span><span class="data-val">{{ http_analysis.response_time_ms }}ms</span></div>{% endif %}
+        {% if http_analysis.vulnerabilities %}
+        <div style="margin-top:14px;padding:12px;background:rgba(255,80,0,.05);border:1px solid rgba(255,80,0,.15);border-radius:6px;">
+            <div style="font-size:.72em;letter-spacing:2px;color:#ff8c42;margin-bottom:8px;">VULNERABILITIES ({{ http_analysis.vulnerabilities|length }})</div>
+            {% for v in http_analysis.vulnerabilities %}<div class="finding-item">{{ v }}</div>{% endfor %}
+        </div>
+        {% endif %}
+        {% if http_analysis.recommendations %}
+        <div style="margin-top:12px;padding:12px;background:rgba(0,180,255,.04);border:1px solid rgba(0,180,255,.1);border-radius:6px;">
+            <div style="font-size:.72em;letter-spacing:2px;color:#00b4ff;margin-bottom:8px;">RECOMMENDATIONS ({{ http_analysis.recommendations|length }})</div>
+            {% for r in http_analysis.recommendations %}<div style="font-size:.8em;padding:5px 0;border-bottom:1px solid rgba(0,180,255,.06);color:rgba(168,216,240,.7);">› {{ r }}</div>{% endfor %}
+        </div>
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ══ Network ══ -->
+    <div class="sec-title">⬡ Network Intelligence</div>
+    <div class="cards two">
+
+      <!-- DNS -->
+      <div class="card">
+        <div class="card-head"><span class="card-icon">📡</span><span class="card-title">DNS Information</span></div>
+        {% if dns.error %}<div class="info-box">{{ dns.error }}</div>
+        {% else %}
+        <div class="data-row"><span class="data-key">IP Address</span><span class="data-val"><span class="tag tag-cyan">{{ dns.ip }}</span></span></div>
+        {% for rt in ['A','MX','TXT','NS'] %}{% if dns[rt] %}
+        <div class="data-row"><span class="data-key">{{ rt }} Records</span><span class="data-val">{% for r in dns[rt] %}<span class="tag tag-cyan">{{ r }}</span>{% endfor %}</span></div>
+        {% endif %}{% endfor %}
+        {% endif %}
+      </div>
+
+      <!-- IP Geo -->
+      <div class="card">
+        <div class="card-head"><span class="card-icon">🌍</span><span class="card-title">IP Geolocation</span></div>
+        {% if ip_info.error %}<div class="info-box">{{ ip_info.error }}</div>
+        {% else %}
+        <div class="data-row"><span class="data-key">IP</span><span class="data-val">{{ ip_info.ip }}</span></div>
+        <div class="data-row"><span class="data-key">Location</span><span class="data-val">{{ ip_info.city }}, {{ ip_info.region }}, {{ ip_info.country }}</span></div>
+        <div class="data-row"><span class="data-key">Coordinates</span><span class="data-val">{{ ip_info.lat }}, {{ ip_info.lon }}</span></div>
+        <div class="data-row"><span class="data-key">Timezone</span><span class="data-val">{{ ip_info.timezone }}</span></div>
+        <div class="data-row"><span class="data-key">ISP</span><span class="data-val">{{ ip_info.isp }}</span></div>
+        <div class="data-row"><span class="data-key">ASN</span><span class="data-val">{{ ip_info.asn }}</span></div>
+        {% endif %}
+      </div>
+
+      <!-- CDN -->
+      <div class="card {% if cdn_info.cdn_detected %}safe{% endif %}">
+        <div class="card-head"><span class="card-icon">☁️</span><span class="card-title">CDN Detection</span></div>
+        {% if cdn_info.cdn_detected %}
+        <div class="data-row"><span class="data-key">CDN</span><span class="data-val"><span class="tag tag-green">✓ Detected</span></span></div>
+        <div class="data-row"><span class="data-key">Provider</span><span class="data-val">{{ cdn_info.provider|upper }}</span></div>
+        {% if cdn_info.cname %}<div class="data-row"><span class="data-key">CNAME</span><span class="data-val">{{ cdn_info.cname }}</span></div>{% endif %}
+        {% else %}
+        <div class="data-row"><span class="data-key">CDN</span><span class="data-val"><span class="tag tag-red">✗ Not Detected</span></span></div>
+        {% endif %}
+      </div>
+
+      <!-- Traceroute -->
+      <div class="card">
+        <div class="card-head"><span class="card-icon">🛤️</span><span class="card-title">Traceroute</span></div>
+        {% if traceroute.error %}
+        <div class="info-box">{{ traceroute.error }}</div>
+        {% elif traceroute.hops %}
+        <div class="data-row"><span class="data-key">Total Hops</span><span class="data-val">{{ traceroute.total_hops }}</span></div>
+        <div class="data-row"><span class="data-key">Target IP</span><span class="data-val">{{ traceroute.ip }}</span></div>
+        <table class="r-table" style="margin-top:10px;">
+            <thead><tr><th>Hop</th><th>IP Address</th></tr></thead>
+            <tbody>{% for h in traceroute.hops %}<tr><td>{{ h.hop }}</td><td>{{ h.ip }}</td></tr>{% endfor %}</tbody>
+        </table>
+        {% else %}
+        <div class="info-box">No traceroute data available</div>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- ══ Ports ══ -->
+    <div class="sec-title">⬡ Port Scan</div>
+    <div class="cards wide">
+      <div class="card {% if ports.open_ports %}threat{% endif %}">
+        <div class="card-head"><span class="card-icon">🔌</span><span class="card-title">Open Ports</span></div>
+        {% if ports.error %}<div class="info-box">{{ ports.error }}</div>
+        {% elif ports.open_ports %}
+        <div class="data-row"><span class="data-key">Total Open</span><span class="data-val"><span class="tag tag-orange">{{ ports.total_open }}</span></span></div>
+        <table class="r-table">
+            <thead><tr><th>Port</th><th>Service</th><th>State</th></tr></thead>
+            <tbody>{% for p in ports.open_ports %}<tr><td>{{ p.port }}</td><td>{{ p.service }}</td><td><span class="tag tag-orange">{{ p.state }}</span></td></tr>{% endfor %}</tbody>
+        </table>
+        {% else %}<div style="color:#00dc82;font-size:.82em;">✓ No common ports open</div>{% endif %}
+      </div>
+    </div>
+
+    <!-- ══ Recon ══ -->
+    <div class="sec-title">⬡ Reconnaissance</div>
+    <div class="cards two">
+
+      <!-- WHOIS -->
+      <div class="card">
+        <div class="card-head"><span class="card-icon">📜</span><span class="card-title">WHOIS</span></div>
+        {% if whois.error %}<div class="info-box">{{ whois.error }}</div>
+        {% else %}
+        <div class="data-row"><span class="data-key">Domain</span><span class="data-val">{{ whois.domain_name }}</span></div>
+        <div class="data-row"><span class="data-key">Registrar</span><span class="data-val">{{ whois.registrar }}</span></div>
+        <div class="data-row"><span class="data-key">Created</span><span class="data-val">{{ whois.creation_date }}</span></div>
+        <div class="data-row"><span class="data-key">Expires</span><span class="data-val">{{ whois.expiration_date }}</span></div>
+        <div class="data-row"><span class="data-key">Age</span><span class="data-val">{{ whois.age_days }} days</span></div>
+        {% if whois.name_servers %}<div class="data-row"><span class="data-key">Name Servers</span><span class="data-val">{% for ns in whois.name_servers %}<span class="tag tag-cyan">{{ ns }}</span>{% endfor %}</span></div>{% endif %}
+        {% endif %}
+      </div>
+
+      <!-- Subdomains -->
+      <div class="card">
+        <div class="card-head"><span class="card-icon">🌐</span><span class="card-title">Subdomains</span></div>
+        {% if subdomains %}
+        {% for s in subdomains %}<span class="tag tag-cyan">{{ s }}</span>{% endfor %}
+        {% else %}<div style="color:rgba(168,216,240,.4);font-size:.82em;">No subdomains found</div>{% endif %}
+      </div>
+
+      <!-- Emails -->
+      <div class="card">
+        <div class="card-head"><span class="card-icon">📧</span><span class="card-title">Email Harvesting</span></div>
+        {% if emails.error %}<div class="info-box">{{ emails.error }}</div>
+        {% else %}
+        <div class="data-row"><span class="data-key">Found</span><span class="data-val">{{ emails.total_found }}</span></div>
+        {% if emails.emails %}{% for e in emails.emails %}<div class="data-row"><span class="data-key" style="min-width:0"></span><span class="data-val"><code>{{ e }}</code></span></div>{% endfor %}
+        {% else %}<div style="color:rgba(168,216,240,.4);font-size:.82em;">No emails found</div>{% endif %}
+        {% endif %}
+      </div>
+
+      <!-- Reverse IP -->
+      <div class="card">
+        <div class="card-head"><span class="card-icon">🔄</span><span class="card-title">Reverse IP</span></div>
+        {% if reverse_ip.error %}<div class="info-box">{{ reverse_ip.error }}</div>
+        {% else %}
+        <div class="data-row"><span class="data-key">IP</span><span class="data-val">{{ reverse_ip.ip }}</span></div>
+        <div class="data-row"><span class="data-key">Co-hosted</span><span class="data-val">{{ reverse_ip.total_domains }} domains</span></div>
+        {% if reverse_ip.domains_on_ip %}
+        {% set ns = namespace(c=0) %}{% for d in reverse_ip.domains_on_ip %}{% if ns.c < 15 %}<span class="tag tag-cyan">{{ d }}</span>{% set ns.c = ns.c+1 %}{% endif %}{% endfor %}
+        {% if reverse_ip.domains_on_ip|length > 15 %}<div style="font-size:.72em;color:rgba(168,216,240,.4);margin-top:6px;">+{{ reverse_ip.domains_on_ip|length - 15 }} more</div>{% endif %}
+        {% endif %}
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- ══ Tech & Fingerprint ══ -->
+    <div class="sec-title">⬡ Technology & Fingerprinting</div>
+    <div class="cards two">
+
+      <!-- Tech Stack -->
+      <div class="card">
+        <div class="card-head"><span class="card-icon">🔧</span><span class="card-title">Technology Stack</span></div>
+        {% if tech_stack.error %}<div class="info-box">{{ tech_stack.error }}</div>
+        {% else %}
+        <div class="data-row"><span class="data-key">Detected</span><span class="data-val">{{ tech_stack.total_detected }} technologies</span></div>
+        {% for cat, techs in tech_stack.technologies.items() %}
+        <div style="margin-top:10px;">
+            <div style="font-size:.68em;letter-spacing:2px;color:rgba(0,180,255,.45);text-transform:uppercase;margin-bottom:5px;">{{ cat }}</div>
+            {% for t in techs %}<span class="tag tag-cyan">{{ t }}</span>{% endfor %}
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+
+      <!-- Fingerprint -->
+      <div class="card">
+        <div class="card-head"><span class="card-icon">🔍</span><span class="card-title">Fingerprinting</span></div>
+        {% if fingerprint.error %}<div class="info-box">{{ fingerprint.error }}</div>
+        {% else %}
+        {% if fingerprint.signatures %}
+        <div style="margin-bottom:10px;">{% for s in fingerprint.signatures %}<span class="tag tag-orange">{{ s }}</span>{% endfor %}</div>
+        {% endif %}
+        {% if fingerprint.fingerprints %}
+        {% for k,v in fingerprint.fingerprints.items() %}<div class="data-row"><span class="data-key">{{ k|replace('_',' ')|title }}</span><span class="data-val"><code>{{ v if v is string else v|tojson }}</code></span></div>{% endfor %}
+        {% endif %}
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- ══ Directory Enum ══ -->
+    <div class="sec-title">⬡ Directory Enumeration</div>
+    <div class="cards wide">
+      <div class="card">
+        <div class="card-head"><span class="card-icon">📁</span><span class="card-title">Directory Enumeration</span></div>
+        {% if directories.error %}<div class="info-box">{{ directories.error }}</div>
+        {% else %}
+        <div style="display:flex;gap:20px;margin-bottom:14px;flex-wrap:wrap;">
+            <div><span style="font-size:1.4em;font-weight:700;color:#00b4ff;">{{ directories.total_checked }}</span><div style="font-size:.68em;color:rgba(168,216,240,.4);letter-spacing:1px;">CHECKED</div></div>
+            <div><span style="font-size:1.4em;font-weight:700;color:#ff8c42;">{{ directories.total_found }}</span><div style="font-size:.68em;color:rgba(168,216,240,.4);letter-spacing:1px;">FOUND</div></div>
+        </div>
+        {% if directories.categories %}
+        {% if directories.categories.accessible %}
+        <div style="margin-bottom:12px;">
+            <div style="font-size:.7em;letter-spacing:2px;color:#00dc82;margin-bottom:6px;">ACCESSIBLE ({{ directories.categories.accessible|length }})</div>
+            {% set ns = namespace(c=0) %}{% for p in directories.categories.accessible %}{% if ns.c < 10 %}<div class="data-row"><span class="data-val"><code>{{ p.path }}</code> <span class="tag tag-green">{{ p.status }}</span></span></div>{% set ns.c = ns.c+1 %}{% endif %}{% endfor %}
+            {% if directories.categories.accessible|length > 10 %}<div style="font-size:.72em;color:rgba(168,216,240,.3);">+{{ directories.categories.accessible|length - 10 }} more</div>{% endif %}
+        </div>
+        {% endif %}
+        {% if directories.categories.forbidden %}
+        <div style="margin-bottom:12px;">
+            <div style="font-size:.7em;letter-spacing:2px;color:#ff8c42;margin-bottom:6px;">FORBIDDEN ({{ directories.categories.forbidden|length }})</div>
+            {% set ns = namespace(c=0) %}{% for p in directories.categories.forbidden %}{% if ns.c < 5 %}<div class="data-row"><span class="data-val"><code>{{ p.path }}</code> <span class="tag tag-orange">{{ p.status }}</span></span></div>{% set ns.c = ns.c+1 %}{% endif %}{% endfor %}
+        </div>
+        {% endif %}
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ══ Banners ══ -->
+    <div class="sec-title">⬡ Server Banners</div>
+    <div class="cards wide">
+      <div class="card">
+        <div class="card-head"><span class="card-icon">🏷️</span><span class="card-title">Banner Grabbing</span></div>
+        {% if banners.error %}<div class="info-box">{{ banners.error }}</div>
+        {% else %}
+        {% if banners.ip %}<div class="data-row"><span class="data-key">IP</span><span class="data-val">{{ banners.ip }}</span></div>{% endif %}
+        {% if banners.http_banner %}
+        <div style="margin-top:12px;font-size:.7em;letter-spacing:2px;color:rgba(0,180,255,.45);margin-bottom:6px;">HTTP HEADERS</div>
+        {% for h,v in banners.http_banner.items() %}<div class="data-row"><span class="data-key">{{ h }}</span><span class="data-val"><code>{{ v }}</code></span></div>{% endfor %}
+        {% endif %}
+        {% if banners.server_info %}
+        <div style="margin-top:12px;font-size:.7em;letter-spacing:2px;color:rgba(0,180,255,.45);margin-bottom:6px;">SERVER INFO</div>
+        {% for k,v in banners.server_info.items() %}<div class="data-row"><span class="data-key">{{ k|title }}</span><span class="data-val">{{ v }}</span></div>{% endfor %}
+        {% endif %}
+        {% if banners.service_banners %}
+        <div style="margin-top:12px;font-size:.7em;letter-spacing:2px;color:rgba(0,180,255,.45);margin-bottom:6px;">SERVICE BANNERS</div>
+        {% for svc,banner in banners.service_banners.items() %}<div style="margin-bottom:8px;"><div style="font-size:.75em;color:#ff8c42;margin-bottom:4px;">{{ svc }}</div><pre>{{ banner }}</pre></div>{% endfor %}
+        {% endif %}
+        {% if not banners.http_banner and not banners.service_banners %}<div style="color:rgba(168,216,240,.4);font-size:.82em;">No banners retrieved</div>{% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+</div><!-- /page -->
+
+<canvas id="cyberCanvas" style="position:fixed;inset:0;z-index:0;pointer-events:none;"></canvas>
+
+<script>
+/* ══ AI Solutions ══ */
+function runAIScan() {
+    const btn = document.getElementById('aiRunBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Running...';
+
+    document.getElementById('aiIdle').style.display    = 'none';
+    document.getElementById('aiError').style.display   = 'none';
+    document.getElementById('aiOutput').style.display  = 'none';
+    document.getElementById('aiLoading').style.display = 'block';
+
+    // Collect scan data from the page
+    const findings = [];
+    document.querySelectorAll('.finding-item').forEach(el => findings.push(el.textContent.trim()));
+
+    const openPorts = [];
+    document.querySelectorAll('.r-table tbody tr').forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 2) openPorts.push(cells[0].textContent.trim() + ' (' + cells[1].textContent.trim() + ')');
+    });
+
+    const missingHeaders = [];
+    document.querySelectorAll('.tag-red').forEach(t => {
+        const txt = t.textContent.trim();
+        if (!txt.includes('Invalid') && !txt.includes('Detected') && !txt.includes('No')) missingHeaders.push(txt);
+    });
+
+    const noWaf = [...document.querySelectorAll('.tag-red')].some(t => t.textContent.includes('Not Detected'));
+    const sslInvalid = [...document.querySelectorAll('.tag-red')].some(t => t.textContent.includes('Invalid'));
+
+    const cvssEl  = document.querySelector('.cvss-num');
+    const cvssScore = cvssEl ? parseFloat(cvssEl.textContent) : 0;
+    const sevEl   = document.querySelector('.cvss-sev');
+    const cvssStr = sevEl ? sevEl.textContent.trim() : '';
+
+    const phishEl = [...document.querySelectorAll('.data-row')].find(r => r.textContent.includes('Risk Score'));
+    let phishScore = 0;
+    if (phishEl) { const m = phishEl.textContent.match(/(\d+)/); if (m) phishScore = parseInt(m[1]); }
+
+    const exposedPaths = [];
+    document.querySelectorAll('.dir-category code').forEach(c => exposedPaths.push(c.textContent.trim()));
+
+    const domain = document.querySelector('.topbar-domain')?.textContent.replace('// ','').trim() || '';
+
+    const payload = {
+        domain,
+        scan_summary: {
+            ssl_invalid: sslInvalid,
+            missing_headers: missingHeaders,
+            open_ports: openPorts,
+            phishing_score: phishScore,
+            no_waf: noWaf,
+            vulnerabilities: findings,
+            cvss_score: cvssScore,
+            cvss_severity: cvssStr,
+            exposed_paths: exposedPaths
+        }
+    };
+
+    const outputDiv = document.getElementById('aiText');
+    outputDiv.innerHTML = '';
+    let buffer = '';
+
+    fetch('/ai_solutions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(res => {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        document.getElementById('aiLoading').style.display = 'none';
+        document.getElementById('aiOutput').style.display  = 'block';
+        document.getElementById('aiSolutionsCard').classList.add('threat');
+
+        function read() {
+            reader.read().then(({ done, value }) => {
+                if (done) {
+                    btn.disabled = false;
+                    btn.textContent = '↺ RE-ANALYZE';
+                    renderMarkdown(outputDiv, buffer);
+                    return;
+                }
+                const text = decoder.decode(value);
+                text.split('\n').forEach(line => {
+                    if (!line.startsWith('data: ')) return;
+                    try {
+                        const d = JSON.parse(line.slice(6));
+                        if (d.error) {
+                            document.getElementById('aiOutput').style.display = 'none';
+                            document.getElementById('aiError').style.display  = 'block';
+                            document.getElementById('aiError').textContent    = '⚠ ' + d.error;
+                            btn.disabled = false; btn.textContent = '▶ ANALYZE';
+                        } else if (d.text) {
+                            buffer += d.text;
+                            // Live typewriter — show raw while streaming
+                            outputDiv.textContent = buffer + '▋';
+                            outputDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                        } else if (d.done) {
+                            renderMarkdown(outputDiv, buffer);
+                            btn.disabled = false; btn.textContent = '↺ RE-ANALYZE';
+                            // Save AI solution for PDF inclusion
+                            fetch('/save_ai_solution', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({domain: domain, ai_text: buffer})
+                            });
+                        }
+                    } catch(e) {}
+                });
+                read();
+            });
+        }
+        read();
+    }).catch(err => {
+        document.getElementById('aiLoading').style.display = 'none';
+        document.getElementById('aiError').style.display   = 'block';
+        document.getElementById('aiError').textContent     = '⚠ Connection error: ' + err.message;
+        btn.disabled = false; btn.textContent = '▶ ANALYZE';
+    });
+}
+
+function renderMarkdown(el, text) {
+    const lines = text.split('\n');
+    let html = '';
+    let inCode = false;
+    let inList = false;
+
+    lines.forEach(line => {
+        const t = line.trimEnd();
+
+        // Code block toggle
+        if (t.startsWith('```')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            inCode = !inCode;
+            if (inCode) html += '<pre style="background:rgba(0,0,0,.45);border:1px solid rgba(0,180,255,.15);border-radius:5px;padding:10px 14px;font-family:Courier New,monospace;font-size:.78em;color:#ff8c42;margin:8px 0;white-space:pre-wrap;">';
+            else        html += '</pre>';
+            return;
+        }
+        if (inCode) { html += escHtml(t) + '\n'; return; }
+
+        const s = t.trim();
+        if (!s) {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += '<div style="height:6px"></div>';
+            return;
+        }
+
+        // Headings
+        if (s.startsWith('### ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<div style="font-size:.88em;font-weight:700;color:#00e5ff;margin:12px 0 4px;letter-spacing:.5px;">${inline(s.slice(4))}</div>`;
+            return;
+        }
+        if (s.startsWith('## ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<div style="font-size:.95em;font-weight:700;color:#00b4ff;margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid rgba(0,180,255,.2);letter-spacing:1px;">${inline(s.slice(3))}</div>`;
+            return;
+        }
+        if (s.startsWith('# ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<div style="font-size:1.05em;font-weight:700;color:#00b4ff;margin:18px 0 8px;">${inline(s.slice(2))}</div>`;
+            return;
+        }
+
+        // HR
+        if (s.startsWith('---') || s.startsWith('===')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += '<hr style="border:none;border-top:1px solid rgba(0,180,255,.15);margin:10px 0;">';
+            return;
+        }
+
+        // Bullet list
+        if (s.startsWith('- ') || s.startsWith('* ')) {
+            if (!inList) { html += '<ul style="padding-left:18px;margin:6px 0;">'; inList = true; }
+            html += `<li style="margin:3px 0;color:rgba(168,216,240,.85);font-size:.8em;">${inline(s.slice(2))}</li>`;
+            return;
+        }
+
+        if (inList) { html += '</ul>'; inList = false; }
+
+        // Severity badges
+        const low = s.toLowerCase();
+        let color = '';
+        if (low.includes('critical')) color = '#ff2255';
+        else if (low.includes('severity: high') || low.match(/\bhigh\b/)) color = '#ff6600';
+        else if (low.includes('medium')) color = '#ffaa00';
+
+        if (color) {
+            html += `<div style="font-size:.8em;color:${color};font-weight:600;margin:4px 0;">${inline(s)}</div>`;
+        } else {
+            html += `<div style="font-size:.8em;color:rgba(168,216,240,.8);line-height:1.7;margin:2px 0;">${inline(s)}</div>`;
+        }
+    });
+
+    if (inList) html += '</ul>';
+    if (inCode) html += '</pre>';
+    el.innerHTML = html;
+}
+
+function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function inline(s) {
+    return escHtml(s)
+        .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#fff;">$1</strong>')
+        .replace(/\*(.+?)\*/g,     '<em>$1</em>')
+        .replace(/`([^`]+)`/g,     '<code style="background:rgba(0,0,0,.4);padding:1px 6px;border-radius:3px;color:#ff8c42;font-family:Courier New,monospace;font-size:.9em;">$1</code>');
+}
+</script>
+
+<script>
+/* ══ Particle Network Canvas ══ */
+(function(){
+    const canvas = document.getElementById('cyberCanvas');
+    const ctx = canvas.getContext('2d');
+    let W, H, nodes;
+    const N=55, LINK=160, CYAN='rgba(0,180,255,', ORANGE='rgba(255,120,0,';
+
+    function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
+
+    function init(){
+        nodes=Array.from({length:N},()=>({
+            x:Math.random()*W, y:Math.random()*H,
+            vx:(Math.random()-.5)*.4, vy:(Math.random()-.5)*.4,
+            r:1.2+Math.random()*1.8,
+            col:Math.random()>.85?ORANGE:CYAN,
+            p:Math.random()*Math.PI*2
+        }));
+    }
+
+    function drawHex(x,y,s,a,c){
+        ctx.beginPath();
+        for(let i=0;i<6;i++){const ang=(Math.PI/3)*i-Math.PI/6;i?ctx.lineTo(x+s*Math.cos(ang),y+s*Math.sin(ang)):ctx.moveTo(x+s*Math.cos(ang),y+s*Math.sin(ang));}
+        ctx.closePath();ctx.strokeStyle=c+a+')';ctx.lineWidth=.7;ctx.stroke();
+    }
+
+    function tick(){
+        ctx.clearRect(0,0,W,H);
+        nodes.forEach(n=>{n.x+=n.vx;n.y+=n.vy;n.p+=.016;
+            if(n.x<0||n.x>W)n.vx*=-1;if(n.y<0||n.y>H)n.vy*=-1;});
+
+        for(let i=0;i<nodes.length;i++) for(let j=i+1;j<nodes.length;j++){
+            const a=nodes[i],b=nodes[j],dx=a.x-b.x,dy=a.y-b.y,d=Math.sqrt(dx*dx+dy*dy);
+            if(d<LINK){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+                ctx.strokeStyle=a.col+(1-d/LINK)*.15+')';ctx.lineWidth=.5;ctx.stroke();}
+        }
+
+        nodes.forEach(n=>{
+            const p=.5+.5*Math.sin(n.p);
+            if(n.r>2.5){drawHex(n.x,n.y,10+p*4,.07+p*.06,n.col);drawHex(n.x,n.y,17+p*3,.03+p*.03,n.col);}
+            ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+            ctx.fillStyle=n.col+(.35+p*.4)+')';ctx.fill();
+            const g=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,n.r*5);
+            g.addColorStop(0,n.col+(.12+p*.08)+')');g.addColorStop(1,n.col+'0)');
+            ctx.beginPath();ctx.arc(n.x,n.y,n.r*5,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+        });
+
+        if(Math.random()<.01){
+            const x=Math.random()*W;
+            ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+(Math.random()-.5)*60,H);
+            ctx.strokeStyle=CYAN+'.025)';ctx.lineWidth=1;ctx.stroke();
+        }
+        requestAnimationFrame(tick);
+    }
+
+    window.addEventListener('resize',()=>{resize();init();});
+    resize();init();tick();
+
+    // Scroll-in cards
+    const obs=new IntersectionObserver(entries=>{
+        entries.forEach(e=>{if(e.isIntersecting){e.target.style.opacity='1';e.target.style.transform='translateY(0)';}});
+    },{threshold:.1});
+    document.querySelectorAll('.card').forEach((c,i)=>{
+        c.style.opacity='0';c.style.transform='translateY(22px)';
+        c.style.transition=`opacity .5s ease ${i*.06}s,transform .5s ease ${i*.06}s`;
+        obs.observe(c);
+    });
+})();
+</script>
 </body>
 </html>

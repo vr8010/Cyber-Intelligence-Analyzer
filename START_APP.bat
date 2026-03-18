@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo Cyber Intelligence Analyzer
+echo CYBERSCAN.AI
 echo ========================================
 echo.
 echo Starting application...

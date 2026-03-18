@@ -121,7 +121,7 @@ if __name__ == '__main__':
     test_domains = ['google.com', 'github.com']
     
     print("\n" + "="*60)
-    print("CYBER INTELLIGENCE ANALYZER - MODULE TEST")
+    print("CYBERSCAN.AI - MODULE TEST")
     print("="*60)
     
     for domain in test_domains:
